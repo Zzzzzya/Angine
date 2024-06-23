@@ -64,7 +64,8 @@ void main(){
     vec3 ViewDir = camera.position - FragPos;
     vec3 NormalViewDir = normalize(ViewDir);
     vec3 LightReflect = normalize(reflect(-NormalLightDir,Normal));
-    float spec = pow(max(dot(NormalViewDir,LightReflect),0.0f),material.shininess);
+    vec3 h = normalize(NormalLightDir + NormalViewDir);
+    float spec = pow(max(dot(h,Normal),0.0f),material.shininess);
     vec3 specColor = vec3(texture(texture_specular1,TexCoords));
     if(specColor == vec3(0.0f,0.0f,0.0f)){
         specColor = material.specular;

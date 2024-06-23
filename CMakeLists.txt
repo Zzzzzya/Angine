@@ -16,7 +16,7 @@ find_package(assimp CONFIG REQUIRED)
 include_directories(${PROJECT_SOURCE_DIR}/include)
 
 file(GLOB_RECURSE SRC_FILES ${PROJECT_SOURCE_DIR}/src/*.cc)
-file(GLOB_RECURSE TEST_FILES ${PROJECT_SOURCE_DIR}/test/*.cc)
+file(GLOB_RECURSE TEST_FILES ${PROJECT_SOURCE_DIR}/test/main.cc)
 
 add_executable(MyEngine ${SRC_FILES} ${TEST_FILES})
 

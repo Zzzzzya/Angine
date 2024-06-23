@@ -9,7 +9,6 @@ Model::Model(const std::string &filename, Shader &shader, int i) : shader(shader
 }
 
 mat4 Model::ModelMat() {
-    mat4 model(1.0f);
     model = glm::rotate(model, radians(rotate.x), vec3(1.0f, 0.0f, 0.0f));
     model = glm::rotate(model, radians(rotate.y), vec3(0.0f, 1.0f, 0.0f));
     model = glm::rotate(model, radians(rotate.z), vec3(0.0f, 0.0f, -1.0f));
@@ -41,7 +40,7 @@ void Model::loadModel(const std::string &filename) {
     auto path = "../res/models/" + filename;
 
     // 读取Scene对象!                              |     自动生成法线     |     自动拆为三角形       |    反转UV |
-    const aiScene *scene = importer.ReadFile(path, aiProcess_GenNormals | aiProcess_Triangulate | aiProcess_FlipUVs);
+    const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         std::clog << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
         return;
@@ -57,7 +56,7 @@ void Model::loadModel(int i, const std::string &filename) {
     auto path = filename;
 
     // 读取Scene对象!                              |     自动生成法线     |     自动拆为三角形       |    反转UV |
-    const aiScene *scene = importer.ReadFile(path, aiProcess_GenNormals | aiProcess_Triangulate | aiProcess_FlipUVs);
+    const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         std::clog << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
         return;
@@ -154,9 +153,6 @@ PointLightModel::PointLightModel(Shader &shader, const PointLight &tlight)
 
 mat4 PointLightModel::ModelMat() {
     mat4 model(1.0f);
-    model = glm::rotate(model, radians(rotate.x), vec3(1.0f, 0.0f, 0.0f));
-    model = glm::rotate(model, radians(rotate.y), vec3(0.0f, 1.0f, 0.0f));
-    model = glm::rotate(model, radians(rotate.z), vec3(0.0f, 0.0f, -1.0f));
     model = glm::scale(model, scale);
     model = glm::translate(model, light.position);
     return model;
