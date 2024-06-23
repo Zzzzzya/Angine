@@ -36,42 +36,48 @@ in vec2 TexCoords;
 out vec4 FragColor;
 
 uniform Camera camera;
-uniform PointLight light;
+uniform int lightNum;
+uniform PointLight light[10];
 uniform Material material;
+uniform vec4 ObjectColor;
 
 uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_specular1;
 
 void main(){
-    vec3 LightDir = light.position - FragPos;
-    vec3 NormalLightDir = normalize(LightDir);
-    float LightDis = length(LightDir);
-    float reduce = 1 / (light.constant + light.ones * LightDis + light.secs * LightDis * LightDis);
+    vec3 result = vec3(0.0f);
+    for(int i=0;i<lightNum;i++){
+        vec3 LightDir = light[i].position - FragPos;
+        vec3 NormalLightDir = normalize(LightDir);
+        float LightDis = length(LightDir);
+        float reduce = 1 / (light[i].constant + light[i].ones * LightDis + light[i].secs * LightDis * LightDis);
 
-    // ambient
-    vec3 diffColor = vec3(texture(texture_diffuse1,TexCoords));
-    if(diffColor == vec3(0.0f,0.0f,0.0f)){
-        diffColor = material.diffuse;
+        // ambient
+        vec3 diffColor = vec3(texture(texture_diffuse1,TexCoords));
+        if(diffColor == vec3(0.0f,0.0f,0.0f)){
+            diffColor = material.diffuse;
+        }
+        vec3 ambient = light[i].ambient * diffColor;
+
+        // diffuse
+        float diff = max(dot(Normal,NormalLightDir),0);
+        vec3 diffuse = diff * light[i].diffuse * diffColor;
+
+
+        // specular
+        vec3 ViewDir = camera.position - FragPos;
+        vec3 NormalViewDir = normalize(ViewDir);
+        vec3 LightReflect = normalize(reflect(-NormalLightDir,Normal));
+        vec3 h = normalize(NormalLightDir + NormalViewDir);
+        float spec = pow(max(dot(h,Normal),0.0f),material.shininess);
+        vec3 specColor = vec3(texture(texture_specular1,TexCoords));
+        if(specColor == vec3(0.0f,0.0f,0.0f)){
+            specColor = material.specular;
+        }
+        vec3 specular = spec * light[i].specular * specColor;
+
+        result = result + reduce * (ambient + diffuse + specular);
     }
-    vec3 ambient = light.ambient * diffColor;
 
-    // diffuse
-    float diff = max(dot(Normal,NormalLightDir),0);
-    vec3 diffuse = diff * light.diffuse * diffColor;
-
-
-    // specular
-    vec3 ViewDir = camera.position - FragPos;
-    vec3 NormalViewDir = normalize(ViewDir);
-    vec3 LightReflect = normalize(reflect(-NormalLightDir,Normal));
-    vec3 h = normalize(NormalLightDir + NormalViewDir);
-    float spec = pow(max(dot(h,Normal),0.0f),material.shininess);
-    vec3 specColor = vec3(texture(texture_specular1,TexCoords));
-    if(specColor == vec3(0.0f,0.0f,0.0f)){
-        specColor = material.specular;
-    }
-    vec3 specular = spec * light.specular * specColor;
-
-    vec3 result = reduce * (ambient + diffuse + specular);
-    FragColor = vec4(result,1.0f);
+    FragColor = vec4(result,1.0f) * ObjectColor;
 }

@@ -13,6 +13,7 @@ class Material;
 class Shader {
   public:
     unsigned int pro = -1;
+    Shader() = default;
     Shader(const std::string &vertexPath, const std::string &fragmentPath,
            const std::string &vertexDirectory = "../res/shaders/vertex/",
            const std::string &fragmentDirectory = "../res/shaders/fragment/");
@@ -38,7 +39,7 @@ class Shader {
     // Uniforms
     void setMVPS(const glm::mat4 &model, const glm::mat4 &view, const glm::mat4 &projection);
     void setCam(shared_ptr<Camera> cam);
-    void setPointLight(const PointLight &light);
+    void setPointLight(int i, const PointLight &light);
     void setMaterial(const Material &mat);
 
   private:

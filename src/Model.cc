@@ -1,7 +1,7 @@
 #include "Model.hpp"
 
 // 加载filename的Model
-Model::Model(const std::string &filename, Shader &shader, int i) : shader(shader) {
+Model::Model(const std::string &filename, shared_ptr<Shader> &shader, int i) : shader(shader) {
     if (i == 0)
         loadModel(filename);
     else
@@ -9,11 +9,14 @@ Model::Model(const std::string &filename, Shader &shader, int i) : shader(shader
 }
 
 mat4 Model::ModelMat() {
+    model = glm::mat4(1.0f);
+
+    model = glm::translate(model, translate);
+    model = glm::scale(model, scale);
     model = glm::rotate(model, radians(rotate.x), vec3(1.0f, 0.0f, 0.0f));
     model = glm::rotate(model, radians(rotate.y), vec3(0.0f, 1.0f, 0.0f));
     model = glm::rotate(model, radians(rotate.z), vec3(0.0f, 0.0f, -1.0f));
-    model = glm::scale(model, scale);
-    model = glm::translate(model, translate);
+
     return model;
 }
 
@@ -146,14 +149,23 @@ vector<Texture> Model::loadMaterialTextures(aiMaterial *mat, aiTextureType type,
     return textures;
 }
 
-PointLightModel::PointLightModel(Shader &shader, const PointLight &tlight)
+PointLightModel::PointLightModel(shared_ptr<Shader> &shader, const PointLight &tlight)
     : Model("Sphere/Sphere.obj", shader), light(tlight) {
     this->translate = this->light.position;
 }
 
 mat4 PointLightModel::ModelMat() {
     mat4 model(1.0f);
-    model = glm::scale(model, scale);
+
     model = glm::translate(model, light.position);
+    model = glm::scale(model, scale);
     return model;
+}
+
+void PointLightModel::updatePosition(double curTime) {
+    if (goRoundY) {
+        auto r = sqrt(light.position.x * light.position.x + light.position.z * light.position.z);
+        light.position.x = cos(radians(curTime * 100)) * r;
+        light.position.z = sin(radians(curTime * 100)) * r;
+    }
 }

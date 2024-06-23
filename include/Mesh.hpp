@@ -22,7 +22,7 @@ class Mesh {
     vector<Texture> textures;
 
     Mesh(const vector<Vertex> &vertice, const vector<unsigned int> &indices, const vector<Texture> &textures);
-    void Draw(Shader &shader);
+    void Draw(shared_ptr<Shader> &Shader);
 
   private:
     unsigned int VAO, VBO, EBO;

@@ -54,6 +54,17 @@ int current_model_index = -1;
 /* 当前选中的光照 */
 int current_light_index = -1;
 
+/* 帧数 */
+float fps = 0.0f;
+
+/* Shaders */
+shared_ptr<Shader> LightShader;
+shared_ptr<Shader> EmptyPhoneShader;
+shared_ptr<Shader> PhoneShader;
+shared_ptr<Shader> NormalShader;
+shared_ptr<Shader> ZdepthShader;
+vector<shared_ptr<Shader>> MyShaders;
+
 auto ProcessKeyInput = [](GLFWwindow *window) -> void {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         if (CursorIsIn) {
@@ -151,14 +162,24 @@ int main(int argc, char **argv) {
     // Mine
     glEnable(GL_DEPTH_TEST);
 
-    Shader myshader("MVP_3.vs", "Model.fs");
-    Shader LightShader("MVP_3.vs", "Light.fs");
-    Shader EmptyPhoneShader("MVP_3.vs", "Empty_Blinn_Phone.fs");
-    Shader PhoneShader("MVP_3.vs", "Blinn_Phone.fs");
+    mat4 model(1.0f);
+
+    LightShader = std::make_shared<Shader>("MVP_3.vs", "Light.fs");
+    EmptyPhoneShader = std::make_shared<Shader>("MVP_3.vs", "Empty_Blinn_Phone.fs");
+    PhoneShader = std::make_shared<Shader>("MVP_3.vs", "Blinn_Phone.fs");
+    NormalShader = std::make_shared<Shader>("MVP_3.vs", "Normal.fs");
+    ZdepthShader = std::make_shared<Shader>("MVP_depth.vs", "Z-Depth.fs");
+
+    MyShaders.push_back(PhoneShader);
+    MyShaders.push_back(ZdepthShader);
+    MyShaders.push_back(NormalShader);
+    MyShaders.push_back(LightShader);
 
     scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", PhoneShader));
-    scene->models.push_back(std::make_shared<Model>("floor/floor.obj", EmptyPhoneShader));
+    scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PhoneShader));
+
     scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
+    scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
     // // 相机创建！
 
     scene->camera = std::make_shared<Camera>(vec3(0.0f, 5.0f, 5.0f));
@@ -168,14 +189,17 @@ int main(int argc, char **argv) {
     theLight.ambient = vec3(0.2f, 0.2f, 0.2f);
     theLight.diffuse = vec3(0.5f, 0.5f, 0.5f);
     theLight.specular = vec3(1.0f, 1.0f, 1.0f);
-    theLight.ones = 0.3;
-    theLight.secs = 0.032;
+    theLight.ones = 0.03;
+    theLight.secs = 0.003;
     scene->pointLights[0]->light = theLight;
 
+    int frameCount = 0;
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         curTime = glfwGetTime();
         deltaTime = curTime - lastTime;
+        if ((frameCount++) % 100 == 0)
+            fps = 1 / deltaTime;
         lastTime = curTime;
 
         // Start the ImGui frame
@@ -203,22 +227,29 @@ int main(int argc, char **argv) {
 
         mat4 projection(1.0f), view(1.0f), object(1.0f);
         view = scene->camera->ViewMat();
-        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 1000.0f);
+        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
+
+        for (auto &light : scene->pointLights) {
+            light->updatePosition(curTime);
+            light->shader->use();
+            light->shader->setMVPS(light->ModelMat(), view, projection);
+            light->Draw();
+        }
 
         for (auto &model : scene->models) {
-            model->shader.use();
-            model->shader.setMVPS(model->ModelMat(), view, projection);
-            model->shader.setCam(scene->camera);
-            model->shader.setPointLight(scene->pointLights[0]->light);
-            model->shader.setMaterial(model->mat);
+            model->shader->use();
+            model->shader->setMVPS(model->ModelMat(), view, projection);
+            model->shader->setCam(scene->camera);
+            // 多光源设置
+            model->shader->setInt("lightNum", scene->pointLights.size());
+            for (int i = 0; i < scene->pointLights.size(); i++) {
+                model->shader->setPointLight(i, scene->pointLights[i]->light);
+            }
+            model->shader->setMaterial(model->mat);
+            model->shader->setVec4("ObjectColor", model->ObjectColor);
             model->Draw();
         }
 
-        for (auto &light : scene->pointLights) {
-            light->shader.use();
-            light->shader.setMVPS(light->ModelMat(), view, projection);
-            light->Draw();
-        }
         // END Myrender
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -240,9 +271,14 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+/*
+    主功能界面：
+    包括：   进入摄像机
+            导入模型 - 默认使用光照模型（纯白）
+*/
 void AppMainFunction() {
     ImGui::Begin("MainFunction");
-    ImGui::Text("This is some useful text.");
+    ImGui::Text("FPS: %.1f", fps);
     if (ImGui::Button("InMode")) {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         CursorIsIn = true;
@@ -268,12 +304,17 @@ void AppMainFunction() {
 
         if (GetOpenFileNameA(&ofn) == TRUE) {
             // 用户选择了文件，将文件路径复制到缓冲区中
-            strncpy(filepath, szFile, sizeof(filepath));
+            strncpy_s(filepath, sizeof(filepath), szFile, _TRUNCATE);
             string file = string(filepath);
             replaceBackslashWithForwardslash(file);
-            auto shader = Shader("MVP_3.vs", "Light.fs");
-            scene->models.emplace_back(std::make_shared<Model>(file, shader, 1));
+            scene->models.emplace_back(std::make_shared<Model>(file, LightShader, 1));
         }
+    }
+
+    if (ImGui::Button("Add Light")) {
+        scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
+        scene->pointLights[scene->pointLights.size() - 1]->name =
+            "Light" + std::to_string(scene->pointLights.size() - 1);
     }
 
     ImGui::End();
@@ -299,18 +340,114 @@ void AppModelEdit() {
     auto curModel = scene->models[current_model_index];
     ImGui::Text("Selected Model : %s", curModel->name.c_str());
 
-    ImGui::SliderFloat("translate.x", &curModel->translate.x, -10.0f, 10.0f);
-    ImGui::SliderFloat("translate.y", &curModel->translate.y, -10.0f, 10.0f);
-    ImGui::SliderFloat("translate.z", &curModel->translate.z, -10.0f, 10.0f);
+    if (ImGui::CollapsingHeader("Position")) {
+        ImGui::SliderFloat("translate.x", &curModel->translate.x, -10.0f, 10.0f);
+        ImGui::SliderFloat("translate.y", &curModel->translate.y, -10.0f, 10.0f);
+        ImGui::SliderFloat("translate.z", &curModel->translate.z, -10.0f, 10.0f);
+    }
 
-    ImGui::SliderFloat("scale.x", &curModel->scale.x, 0.0f, 2.5f);
-    ImGui::SliderFloat("scale.y", &curModel->scale.y, 0.0f, 2.5f);
-    ImGui::SliderFloat("scale.z", &curModel->scale.z, 0.0f, 2.5f);
+    if (ImGui::CollapsingHeader("Scale")) {
+        ImGui::SliderFloat("scale.x", &curModel->scale.x, 0.0f, 2.5f);
+        ImGui::SliderFloat("scale.y", &curModel->scale.y, 0.0f, 2.5f);
+        ImGui::SliderFloat("scale.z", &curModel->scale.z, 0.0f, 2.5f);
+    }
 
-    ImGui::SliderFloat("rotate.x", &curModel->rotate.x, -180.0f, 180.0f);
-    ImGui::SliderFloat("rotate.y", &curModel->rotate.y, -180.0f, 180.0f);
-    ImGui::SliderFloat("rotate.z", &curModel->rotate.z, -180.0f, 180.0f);
+    if (ImGui::CollapsingHeader("Rotate")) {
+        ImGui::SliderFloat("rotate.x", &curModel->rotate.x, -180.0f, 180.0f);
+        ImGui::SliderFloat("rotate.y", &curModel->rotate.y, -180.0f, 180.0f);
+        ImGui::SliderFloat("rotate.z", &curModel->rotate.z, -180.0f, 180.0f);
+    }
 
+    if (ImGui::CollapsingHeader("Shader")) {
+        static const char *shader_items[] = {"Blinn Phone", "Z-depth", "Normal", "Light"};
+        static int current_shader_index = 0;
+        if (ImGui::Combo("Select Shader", &current_shader_index, shader_items, IM_ARRAYSIZE(shader_items))) {
+            // 当选择发生变化时，执行相应的逻辑
+            // 例如：切换Shader
+            curModel->shader = MyShaders[current_shader_index];
+        }
+    }
+
+    if (ImGui::CollapsingHeader("Material")) {
+        ImGui::SliderFloat("diffuse", &curModel->mat.diffuse.x, -1.0f, 1.0f);
+        ImGui::SliderFloat("diffuse", &curModel->mat.diffuse.y, -1.0f, 1.0f);
+        ImGui::SliderFloat("diffuse", &curModel->mat.diffuse.z, -1.0f, 1.0f);
+        ImGui::SliderFloat("specular", &curModel->mat.specular.x, -1.0f, 1.0f);
+        ImGui::SliderFloat("specular", &curModel->mat.specular.y, -1.0f, 1.0f);
+        ImGui::SliderFloat("specular", &curModel->mat.specular.z, -1.0f, 1.0f);
+        ImGui::SliderFloat("ambient", &curModel->mat.ambient.x, -1.0f, 1.0f);
+        ImGui::SliderFloat("ambient", &curModel->mat.ambient.y, -1.0f, 1.0f);
+        ImGui::SliderFloat("ambient", &curModel->mat.ambient.z, -1.0f, 1.0f);
+        ImGui::SliderFloat("shininess", &curModel->mat.shininess, 0.0f, 100.0f);
+        ImGui::SliderFloat("ObjectColor.r", &curModel->ObjectColor.r, 0.0f, 1.0f);
+        ImGui::SliderFloat("ObjectColor.g", &curModel->ObjectColor.g, 0.0f, 1.0f);
+        ImGui::SliderFloat("ObjectColor.b", &curModel->ObjectColor.b, 0.0f, 1.0f);
+        ImGui::SliderFloat("ObjectColor.a", &curModel->ObjectColor.a, 0.0f, 1.0f);
+    }
+
+    if (ImGui::CollapsingHeader("Texture")) {
+        ImGui::Text("Texture num: %zu", curModel->textures_loaded.size());
+        // 导入纹理
+        static char filepath[256] = ""; // 存储文件路径的缓冲区
+        // 选择纹理种类
+        static bool texType[4] = {true, false, false, false};
+        static string texTypeString[4] = {"diffuse", "specular", "normal", "height"};
+        for (int i = 0; i < 4; i++) {
+            ImGui::Checkbox((texTypeString[i] + "_tex").c_str(), &texType[i]);
+        }
+
+        if (ImGui::Button("Import Tex")) {
+            OPENFILENAMEA ofn;
+            CHAR szFile[260] = {0};
+
+            ZeroMemory(&ofn, sizeof(ofn));
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = NULL;
+            ofn.lpstrFile = szFile;
+            ofn.lpstrFile[0] = '\0';
+            ofn.nMaxFile = sizeof(szFile);
+            ofn.lpstrFilter = "All\0*.*\0Text\0*.TXT\0";
+            ofn.nFilterIndex = 1;
+            ofn.lpstrFileTitle = NULL;
+            ofn.nMaxFileTitle = 0;
+            ofn.lpstrInitialDir = NULL;
+            ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+            if (GetOpenFileNameA(&ofn) == TRUE) {
+                // 用户选择了文件，将文件路径复制到缓冲区中
+                int p = -1;
+                for (int i = 0; i < 4; i++) {
+                    if (texType[i]) {
+                        p = i;
+                        break;
+                    }
+                }
+                if (p == -1) {
+                    std::clog << "ERROR::TEXTURE::SELECT TEXTURE TYPE FIRST" << std::endl;
+                }
+
+                strncpy_s(filepath, sizeof(filepath), szFile, _TRUNCATE);
+                string file = string(filepath);
+                replaceBackslashWithForwardslash(file);
+                auto filenameLoc = file.find_last_of('/');
+
+                Texture texture(file.substr(filenameLoc + 1));
+                texture.type = "texture_" + texTypeString[p];
+                texture.path = file.substr(0, filenameLoc) + '/';
+                curModel->meshes[0].textures.push_back(texture);
+                curModel->textures_loaded.push_back(texture);
+            }
+        }
+
+        if (ImGui::Button("Delete Tex")) {
+            if (curModel->meshes[0].textures.size()) {
+                curModel->meshes[0].textures.pop_back();
+                curModel->textures_loaded.pop_back();
+            }
+            else
+                std::clog << "Delete Tex Error!" << std::endl;
+        }
+    }
     ImGui::End();
 }
 
@@ -363,6 +500,20 @@ void AppLightEdit() {
         ImGui::SliderFloat("ambient", &curLight->light.ambient.b, -1.0f, 1.0f);
         ImGui::SliderFloat("oncs", &curLight->light.ones, 0.0f, 0.5f);
         ImGui::SliderFloat("secs", &curLight->light.secs, 0.0f, 0.05f);
+    }
+
+    if (ImGui::CollapsingHeader("Shader")) {
+        static const char *shader_items[] = {"Blinn Phone", "Z-depth", "Normal", "Light"};
+        static int current_shader_index = 0;
+        if (ImGui::Combo("Select Shader", &current_shader_index, shader_items, IM_ARRAYSIZE(shader_items))) {
+            // 当选择发生变化时，执行相应的逻辑
+            // 例如：切换Shader
+            curLight->shader = MyShaders[current_shader_index];
+        }
+    }
+
+    if (ImGui::Button("GoRound-Y")) {
+        curLight->goRoundY = !curLight->goRoundY;
     }
 
     ImGui::End();

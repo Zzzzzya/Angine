@@ -7,8 +7,8 @@ Mesh::Mesh(const vector<Vertex> &vertice, const vector<unsigned int> &indices, c
     setupMesh();
 }
 
-void Mesh::Draw(Shader &shader) {
-    shader.use();
+void Mesh::Draw(shared_ptr<Shader> &shader) {
+    shader->use();
 
     int diffuseNr = 1;
     int specularNr = 1;
@@ -29,14 +29,17 @@ void Mesh::Draw(Shader &shader) {
         else if (name == "texture_height")
             number = std::to_string(heightNr++);
 
-        shader.setInt(name + number, i);
+        shader->setInt(name + number, i);
         glBindTexture(GL_TEXTURE_2D, textures[i].id);
     }
     glBindVertexArray(VAO);
     glDrawElements(GL_TRIANGLES, (unsigned int)indices.size(), GL_UNSIGNED_INT, 0);
 
     glBindVertexArray(0);
-    glActiveTexture(GL_TEXTURE0);
+    for (int i = 0; i < textures.size(); i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
 }
 
 void Mesh::setupMesh() {

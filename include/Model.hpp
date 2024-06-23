@@ -17,6 +17,7 @@
 class Model {
   public:
     vector<Texture> textures_loaded; // 用来存储已经加载过的纹理
+    vector<Mesh> meshes;             // 读入的model会是一系列mesh的集合
     std::string directory;
     std::string name;
 
@@ -26,15 +27,15 @@ class Model {
 
     mat4 model = mat4(1.0f);
 
-    Shader shader;
+    shared_ptr<Shader> shader;
 
     Material mat = Material();
-    Model(const std::string &filename, Shader &shader, int i = 0);
+    vec4 ObjectColor = vec4(1.0f);
+    Model(const std::string &filename, shared_ptr<Shader> &shader, int i = 0);
     virtual mat4 ModelMat();
     void Draw();
 
   private:
-    vector<Mesh> meshes; // 读入的model会是一系列mesh的集合
     void loadModel(const std::string &filename);
     void loadModel(int i, const std::string &filename);
     void processNode(aiNode *node, const aiScene *scene);
@@ -44,8 +45,10 @@ class Model {
 
 class PointLightModel : public Model {
   public:
-    PointLightModel(Shader &shader, const PointLight &light = PointLight());
+    PointLightModel(shared_ptr<Shader> &shader, const PointLight &light = PointLight());
     PointLight light;
+    bool goRoundY = false;
     virtual mat4 ModelMat() override;
+    void updatePosition(double curTime);
 };
 #endif

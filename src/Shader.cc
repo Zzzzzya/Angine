@@ -70,15 +70,16 @@ void Shader::setCam(shared_ptr<Camera> cam) {
     this->setVec3("camera.front", cam->front);
 }
 
-void Shader::setPointLight(const PointLight &light) {
-    this->setVec3("light.position", light.position);
-    this->setVec3("light.ambient", light.ambient);
-    this->setVec3("light.diffuse", light.diffuse);
-    this->setVec3("light.specular", light.specular);
+void Shader::setPointLight(int i, const PointLight &light) {
+    auto light_pre = "light[" + std::to_string(i) + "].";
+    this->setVec3(light_pre + "position", light.position);
+    this->setVec3(light_pre + "ambient", light.ambient);
+    this->setVec3(light_pre + "diffuse", light.diffuse);
+    this->setVec3(light_pre + "specular", light.specular);
 
-    this->setFloat("light.constant", 1.0f);
-    this->setFloat("light.ones", light.ones);
-    this->setFloat("light.secs", light.secs);
+    this->setFloat(light_pre + "constant", 1.0f);
+    this->setFloat(light_pre + "ones", light.ones);
+    this->setFloat(light_pre + "secs", light.secs);
 }
 
 void Shader::setMaterial(const Material &mat) {

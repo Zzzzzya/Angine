@@ -18,7 +18,7 @@ class Camera {
 
     float fov = 45.0f;
 
-    float moveSpeed = 4.0f;
+    float moveSpeed = 10.0f;
     float turnSpeed = 0.05f;
 
     enum Movement {
