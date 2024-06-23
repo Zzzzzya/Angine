@@ -1,28 +1,26 @@
-#include "Header.hpp"
-#include "imgui.h"
-#include "imgui_impl_glfw.h"
-#include "imgui_impl_opengl3.h"
-#include <GLFW/glfw3.h>
-
-#include "Shader.hpp"
-#include "Camera.hpp"
-
-#include <iostream>
+#include "Applications.hpp"
 
 static void glfw_error_callback(int error, const char *description) {
     std::cerr << "Glfw Error " << error << ": " << description << std::endl;
 }
 
+static void replaceBackslashWithForwardslash(std::string &str) {
+    size_t pos = 0;
+    while ((pos = str.find("\\", pos)) != std::string::npos) {
+        str.replace(pos, 1, "/");
+        pos += 1; // Move past the replaced "/"
+    }
+}
+
+const std::string ProjectModelsPath = "D:\\Files\\Code\\Graphics\\projects\\MyEngine\\res\\models\\";
+
 /* 窗口大小 */
 int imageWidth = 1600;
 int imageHeight = 900;
 
-/* 视口相机 */
-using Camera::Movement::BACKWARD;
-using Camera::Movement::FORWARD;
-using Camera::Movement::LEFT;
-using Camera::Movement::RIGHT;
-shared_ptr<Camera> TheCam;
+/* 场景 */
+
+shared_ptr<Scene> scene = std::make_shared<Scene>();
 
 /* 帧渲染时间 */
 float deltaTime = 0;
@@ -37,29 +35,7 @@ float LastCursorY = 0;
 bool CursorIsIn = true;
 bool firstIn = false;
 
-auto ProcessKeyInput = [](GLFWwindow *window) -> void {
-    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
-        if (CursorIsIn) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            CursorIsIn = false;
-            firstIn = false;
-        }
-    }
-    if (!CursorIsIn)
-        return;
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-        TheCam->ProcessKeyBoard(FORWARD, deltaTime);
-    }
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-        TheCam->ProcessKeyBoard(BACKWARD, deltaTime);
-    }
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-        TheCam->ProcessKeyBoard(LEFT, deltaTime);
-    }
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-        TheCam->ProcessKeyBoard(RIGHT, deltaTime);
-    }
-};
+GLFWwindow *window = nullptr;
 
 auto ProcessCursorPos = [](GLFWwindow *window, double xpos, double ypos) -> void {
     if (!CursorIsIn)
@@ -75,13 +51,38 @@ auto ProcessCursorPos = [](GLFWwindow *window, double xpos, double ypos) -> void
     LastCursorX = xpos;
     LastCursorY = ypos;
 
-    TheCam->ProcessCursorPos(offsetx, offsety);
+    scene->camera->ProcessCursorPos(offsetx, offsety);
 };
 
 auto ProcessScroll = [](GLFWwindow *window, double xoffset, double yoffset) {
     if (!CursorIsIn)
         return;
-    TheCam->ProcessScroll(yoffset);
+    scene->camera->ProcessScroll(yoffset);
+};
+
+auto ProcessKeyInput = [](GLFWwindow *window) -> void {
+    if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
+        if (CursorIsIn) {
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            CursorIsIn = false;
+            firstIn = false;
+        }
+    }
+    if (!CursorIsIn)
+        return;
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        scene->camera->ProcessKeyBoard(FORWARD, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        scene->camera->ProcessKeyBoard(BACKWARD, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        scene->camera->ProcessKeyBoard(LEFT, deltaTime);
+    }
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        scene->camera->ProcessKeyBoard(RIGHT, deltaTime);
+    }
 };
 
 int main(int argc, char **argv) {
@@ -97,15 +98,13 @@ int main(int argc, char **argv) {
     const char *glsl_version = "#version 330";
 
     // Create window with GLFW
-    GLFWwindow *window = glfwCreateWindow(imageWidth, imageHeight, "Angine", NULL, NULL);
+    window = glfwCreateWindow(imageWidth, imageHeight, "Angine", NULL, NULL);
     if (window == NULL)
         return -1;
     glfwMakeContextCurrent(window);
     glfwSwapInterval(1); // Enable vsync
 
     // 回调函数绑定！ -- 鼠标移动 && 滚轮
-    glfwSetCursorPosCallback(window, ProcessCursorPos);
-    glfwSetScrollCallback(window, ProcessScroll);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     // Initialize OpenGL loader (GLAD in this case)
@@ -124,29 +123,31 @@ int main(int argc, char **argv) {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    glfwSetCursorPosCallback(window, ProcessCursorPos);
+    glfwSetScrollCallback(window, ProcessScroll);
     // Mine
     glEnable(GL_DEPTH_TEST);
-    float vertex[] = {-0.5f, -0.5f, 0.0f, 0.5f, -0.5f, 0.0f, 0.0f, 0.5f, 0.0f};
-    unsigned int VBO, VAO;
-    glGenVertexArrays(1, &VAO);
-    glGenBuffers(1, &VBO);
 
-    glBindVertexArray(VAO);
+    Shader myshader("MVP_3.vs", "Model.fs");
+    Shader LightShader("MVP_3.vs", "Light.fs");
+    Shader EmptyPhoneShader("MVP_3.vs", "Empty_Blinn_Phone.fs");
+    Shader PhoneShader("MVP_3.vs", "Blinn_Phone.fs");
 
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertex), vertex, GL_STATIC_DRAW);
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void *)0);
-
-    glBindVertexArray(0);
-
-    Shader myshader("MVP_0.vs", "SingleColor.fs");
-    myshader.use();
-    auto color = glm::vec4(0.2f, 0.3f, 0.6f, 1.0f);
-    myshader.setVec4("singleColor", color);
-
+    scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", PhoneShader));
+    scene->models.push_back(std::make_shared<Model>("floor/floor.obj", EmptyPhoneShader));
+    scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
     // 相机创建！
-    TheCam = std::make_shared<Camera>(vec3(0.0f, 0.0f, 3.0f));
+
+    scene->camera = std::make_shared<Camera>(vec3(0.0f, 5.0f, 5.0f));
+
+    PointLight theLight;
+    theLight.position = vec3(0.0f, 10.0f, 10.0f);
+    theLight.ambient = vec3(0.2f, 0.2f, 0.2f);
+    theLight.diffuse = vec3(0.5f, 0.5f, 0.5f);
+    theLight.specular = vec3(0.0f, 1.0f, 1.0f);
+    theLight.ones = 0.3;
+    theLight.secs = 0.032;
+    scene->pointLights[0]->light = theLight;
 
     // Main loop
     while (!glfwWindowShouldClose(window)) {
@@ -167,13 +168,44 @@ int main(int argc, char **argv) {
             glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
             CursorIsIn = true;
         }
+
+        static char filepath[256] = ""; // 存储文件路径的缓冲区
+        if (ImGui::Button("Import")) {
+            OPENFILENAMEA ofn;
+            CHAR szFile[260] = {0};
+
+            ZeroMemory(&ofn, sizeof(ofn));
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = NULL;
+            ofn.lpstrFile = szFile;
+            ofn.lpstrFile[0] = '\0';
+            ofn.nMaxFile = sizeof(szFile);
+            ofn.lpstrFilter = "All\0*.*\0Text\0*.TXT\0";
+            ofn.nFilterIndex = 1;
+            ofn.lpstrFileTitle = NULL;
+            ofn.nMaxFileTitle = 0;
+            ofn.lpstrInitialDir = NULL;
+            ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+
+            if (GetOpenFileNameA(&ofn) == TRUE) {
+                // 用户选择了文件，将文件路径复制到缓冲区中
+                strncpy(filepath, szFile, sizeof(filepath));
+                string file = string(filepath);
+                replaceBackslashWithForwardslash(file);
+                auto shader = Shader("MVP_3.vs", "Light.fs");
+                scene->models.emplace_back(std::make_shared<Model>(file, shader, 1));
+            }
+        }
+
         ImGui::End();
 
-        ImGui::Begin("Hello, world!");
-        ImGui::Text("This is some useful text.");
-        if (ImGui::Button("InMode")) {
-            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-            CursorIsIn = true;
+        ImGui::Begin("Model List");
+        ImGui::Text("Select a model to render:");
+        static int current_model_index = 0;
+        for (int i = 0; i < scene->models.size(); ++i) {
+            if (ImGui::Selectable(scene->models[i]->name.c_str(), current_model_index == i)) {
+                current_model_index = i;
+            }
         }
         ImGui::End();
 
@@ -187,17 +219,24 @@ int main(int argc, char **argv) {
         glClearColor(0.45f, 0.35f, 0.60f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        myshader.use();
+        mat4 projection(1.0f), view(1.0f), object(1.0f);
+        view = scene->camera->ViewMat();
+        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 1000.0f);
 
-        mat4 projection(1.0f), view(1.0f), model(1.0f);
-        view = TheCam->ViewMat();
-        projection = glm::perspective(radians(TheCam->fov), (float)display_w / display_h, 0.1f, 1000.0f);
-        myshader.setMat4("model", model);
-        myshader.setMat4("view", view);
-        myshader.setMat4("projection", projection);
+        for (auto &model : scene->models) {
+            model->shader.use();
+            model->shader.setMVPS(model->ModelMat(), view, projection);
+            model->shader.setCam(scene->camera);
+            model->shader.setPointLight(scene->pointLights[0]->light);
+            model->shader.setMaterial(model->mat);
+            model->Draw();
+        }
 
-        glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        for (auto &light : scene->pointLights) {
+            light->shader.use();
+            light->shader.setMVPS(light->ModelMat(), view, projection);
+            light->Draw();
+        }
         // END Myrender
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

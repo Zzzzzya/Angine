@@ -1,4 +1,7 @@
 #include "Shader.hpp"
+#include "Camera.hpp"
+#include "Light.hpp"
+#include "Material.hpp"
 
 #include <gl/glew.h>
 
@@ -53,6 +56,37 @@ void Shader::setVec4(const std::string &name, const glm::vec4 &value) const {
 void Shader::setMat4(const std::string &name, const glm::mat4 &value) const {
     auto loc = glGetUniformLocation(pro, name.c_str());
     glUniformMatrix4fv(loc, 1, GL_FALSE, &value[0][0]);
+}
+
+void Shader::setMVPS(const glm::mat4 &model, const glm::mat4 &view, const glm::mat4 &projection) {
+    this->setMat4("model", model);
+    this->setMat4("view", view);
+    this->setMat4("projection", projection);
+    this->setMat3("normalMatrix", glm::transpose(glm::inverse(model)));
+}
+
+void Shader::setCam(shared_ptr<Camera> cam) {
+    this->setVec3("camera.position", cam->position);
+    this->setVec3("camera.front", cam->front);
+}
+
+void Shader::setPointLight(const PointLight &light) {
+    this->setVec3("light.position", light.position);
+    this->setVec3("light.ambient", light.ambient);
+    this->setVec3("light.diffuse", light.diffuse);
+    this->setVec3("light.specular", light.specular);
+
+    this->setFloat("light.constant", 1.0f);
+    this->setFloat("light.ones", light.ones);
+    this->setFloat("light.secs", light.secs);
+}
+
+void Shader::setMaterial(const Material &mat) {
+    this->setFloat("material.shininess", mat.shininess);
+
+    this->setVec3("material.diffuse", mat.diffuse);
+    this->setVec3("material.specular", mat.specular);
+    this->setVec3("material.ambient", mat.ambient);
 }
 
 void Shader::SetUpShader(const std::string &vertexName, const std::string &fragmentName,

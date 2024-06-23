@@ -4,8 +4,12 @@
 #define SHADER_HPP
 
 #include <string>
+#include "Header.hpp"
 #include <glm/glm.hpp>
 
+class Camera;
+class PointLight;
+class Material;
 class Shader {
   public:
     unsigned int pro = -1;
@@ -30,6 +34,12 @@ class Shader {
     // 4
     void setVec4(const std::string &name, const glm::vec4 &value) const;
     void setMat4(const std::string &name, const glm::mat4 &value) const;
+
+    // Uniforms
+    void setMVPS(const glm::mat4 &model, const glm::mat4 &view, const glm::mat4 &projection);
+    void setCam(shared_ptr<Camera> cam);
+    void setPointLight(const PointLight &light);
+    void setMaterial(const Material &mat);
 
   private:
     void SetUpShader(const std::string &vertexName, const std::string &fragmentName, const std::string &vertexDirectory,

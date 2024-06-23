@@ -1,5 +1,6 @@
 {
   "dependencies": [
+    "assimp",
     "fmt",
     "glew",
     "glfw3",
@@ -11,6 +12,6 @@
         "opengl3-binding"
       ]
     },
-    "assimp"
+    "stb"
   ]
 }
