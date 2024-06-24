@@ -59,6 +59,7 @@ float fps = 0.0f;
 
 /* Shaders */
 shared_ptr<Shader> LightShader;
+shared_ptr<Shader> BorderShader;
 shared_ptr<Shader> EmptyPhoneShader;
 shared_ptr<Shader> PhoneShader;
 shared_ptr<Shader> NormalShader;
@@ -161,9 +162,11 @@ int main(int argc, char **argv) {
 
     // Mine
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_STENCIL_TEST);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
 
-    mat4 model(1.0f);
-
+    /* Shaders 🤣 初始化*/
+    BorderShader = std::make_shared<Shader>("Border.vs", "Border.fs");
     LightShader = std::make_shared<Shader>("MVP_3.vs", "Light.fs");
     EmptyPhoneShader = std::make_shared<Shader>("MVP_3.vs", "Empty_Blinn_Phone.fs");
     PhoneShader = std::make_shared<Shader>("MVP_3.vs", "Blinn_Phone.fs");
@@ -175,7 +178,8 @@ int main(int argc, char **argv) {
     MyShaders.push_back(NormalShader);
     MyShaders.push_back(LightShader);
 
-    scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", PhoneShader));
+    scene->models.push_back(std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", PhoneShader));
+    scene->models[0]->scale = vec3(0.5);
     scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PhoneShader));
 
     scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
@@ -219,16 +223,21 @@ int main(int argc, char **argv) {
         ImGui::Render();
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
+        if (display_h < 1)
+            display_h = 1;
         glViewport(0, 0, display_w, display_h);
 
         // MYrender
         glClearColor(0.45f, 0.35f, 0.60f, 1.00f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         mat4 projection(1.0f), view(1.0f), object(1.0f);
         view = scene->camera->ViewMat();
         projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
 
+        int lightIndex = 0;
+        glStencilMask(0x00);
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
         for (auto &light : scene->pointLights) {
             light->updatePosition(curTime);
             light->shader->use();
@@ -236,7 +245,15 @@ int main(int argc, char **argv) {
             light->Draw();
         }
 
+        int modelIndex = 0;
+        glStencilMask(0x00);
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
         for (auto &model : scene->models) {
+            if (modelIndex++ == current_model_index) {
+                continue;
+            }
+            glStencilMask(0x00);
+            glStencilFunc(GL_ALWAYS, 1, 0xFF);
             model->shader->use();
             model->shader->setMVPS(model->ModelMat(), view, projection);
             model->shader->setCam(scene->camera);
@@ -248,8 +265,41 @@ int main(int argc, char **argv) {
             model->shader->setMaterial(model->mat);
             model->shader->setVec4("ObjectColor", model->ObjectColor);
             model->Draw();
+            glStencilMask(0xFF);
         }
 
+        if (current_model_index != -1) {
+            auto &model = scene->models[current_model_index];
+            glStencilMask(0xff);
+            glStencilFunc(GL_ALWAYS, 1, 0xff);
+            model->shader->use();
+            model->shader->setMVPS(model->ModelMat(), view, projection);
+            model->shader->setCam(scene->camera);
+            // 多光源设置
+            model->shader->setInt("lightNum", scene->pointLights.size());
+            for (int i = 0; i < scene->pointLights.size(); i++) {
+                model->shader->setPointLight(i, scene->pointLights[i]->light);
+            }
+            model->shader->setMaterial(model->mat);
+            model->shader->setVec4("ObjectColor", model->ObjectColor);
+            model->Draw();
+
+            // 绘制边框
+            auto preShader = model->shader;
+            model->shader = BorderShader;
+            glStencilMask(0x00);
+            glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
+            glDisable(GL_DEPTH_TEST);
+
+            model->shader->use();
+            model->shader->setMVPS(model->ModelMat(), view, projection);
+            model->Draw();
+            model->shader = preShader;
+
+            glStencilMask(0xFF);
+            glStencilFunc(GL_ALWAYS, 1, 0x00);
+            glEnable(GL_DEPTH_TEST);
+        }
         // END Myrender
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -324,6 +374,9 @@ void AppModelList() {
     ImGui::Begin("Model List");
     ImGui::Text("Select a model to render:");
     bool flag = true;
+    if (ImGui::Selectable("None", current_model_index == -1)) {
+        current_model_index = -1;
+    }
     for (int i = 0; i < scene->models.size(); ++i) {
         if (ImGui::Selectable(scene->models[i]->name.c_str(), current_model_index == i)) {
             current_model_index = i;
@@ -347,9 +400,9 @@ void AppModelEdit() {
     }
 
     if (ImGui::CollapsingHeader("Scale")) {
-        ImGui::SliderFloat("scale.x", &curModel->scale.x, 0.0f, 2.5f);
-        ImGui::SliderFloat("scale.y", &curModel->scale.y, 0.0f, 2.5f);
-        ImGui::SliderFloat("scale.z", &curModel->scale.z, 0.0f, 2.5f);
+        ImGui::SliderFloat("scale", &curModel->scale.x, 0.0f, 2.5f);
+        ImGui::SliderFloat("scale", &curModel->scale.y, 0.0f, 2.5f);
+        ImGui::SliderFloat("scale", &curModel->scale.z, 0.0f, 2.5f);
     }
 
     if (ImGui::CollapsingHeader("Rotate")) {
@@ -471,15 +524,15 @@ void AppLightEdit() {
     ImGui::Text("Selected light : %s", curLight->name.c_str());
 
     if (ImGui::CollapsingHeader("Edit Position")) {
-        ImGui::SliderFloat("translate.x", &curLight->light.position.x, -10.0f, 10.0f);
-        ImGui::SliderFloat("translate.y", &curLight->light.position.y, -10.0f, 10.0f);
-        ImGui::SliderFloat("translate.z", &curLight->light.position.z, -10.0f, 10.0f);
+        ImGui::SliderFloat("translate.x", &curLight->light.position.x, -50.0f, 50.0f);
+        ImGui::SliderFloat("translate.y", &curLight->light.position.y, -50.0f, 50.0f);
+        ImGui::SliderFloat("translate.z", &curLight->light.position.z, -50.0f, 50.0f);
     }
 
     if (ImGui::CollapsingHeader("Edit Scale")) {
-        ImGui::SliderFloat("scale.x", &curLight->scale.x, 0.0f, 2.5f);
-        ImGui::SliderFloat("scale.y", &curLight->scale.y, 0.0f, 2.5f);
-        ImGui::SliderFloat("scale.z", &curLight->scale.z, 0.0f, 2.5f);
+        ImGui::SliderFloat("scale", &curLight->scale.x, 0.0f, 2.5f);
+        ImGui::SliderFloat("scale", &curLight->scale.y, 0.0f, 2.5f);
+        ImGui::SliderFloat("scale", &curLight->scale.z, 0.0f, 2.5f);
     }
 
     if (ImGui::CollapsingHeader("Edit Rotate")) {

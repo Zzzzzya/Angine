@@ -14,20 +14,34 @@ void Mesh::Draw(shared_ptr<Shader> &shader) {
     int specularNr = 1;
     int normalNr = 1;
     int heightNr = 1;
+
+    shader->setBool("ExistDiffuseTexture", false);
+    shader->setBool("ExistSpecularTexture", false);
+    shader->setBool("ExistNormalTexture", false);
+    shader->setBool("ExistHeightTexture", false);
+
     // 设置纹理 -> 这里保证shader中各种纹理的命名是这种确定的格式
     // 在Model自动读入的过程中，会设置纹理的type
     for (int i = 0; i < textures.size(); i++) {
         glActiveTexture(GL_TEXTURE0 + i);
         std::string number;
         std::string name = textures[i].type;
-        if (name == "texture_diffuse")
+        if (name == "texture_diffuse") {
             number = std::to_string(diffuseNr++);
-        else if (name == "texture_specular")
+            shader->setBool("ExistDiffuseTexture", true);
+        }
+        else if (name == "texture_specular") {
             number = std::to_string(specularNr++);
-        else if (name == "texture_normal")
+            shader->setBool("ExistSpecularTexture", true);
+        }
+        else if (name == "texture_normal") {
             number = std::to_string(normalNr++);
-        else if (name == "texture_height")
+            shader->setBool("ExistNormalTexture", true);
+        }
+        else if (name == "texture_height") {
             number = std::to_string(heightNr++);
+            shader->setBool("ExistHeightTexture", true);
+        }
 
         shader->setInt(name + number, i);
         glBindTexture(GL_TEXTURE_2D, textures[i].id);
