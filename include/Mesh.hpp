@@ -38,7 +38,7 @@ class QuadMesh2D {
   public:
     vector<Vertex2D> vertice;
     unsigned int VAO, VBO;
-    QuadMesh2D();
+    QuadMesh2D(const vector<Vertex2D> &vers);
     void Draw(shared_ptr<Shader> &Shader);
 
   private:

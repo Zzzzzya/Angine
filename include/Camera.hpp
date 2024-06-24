@@ -31,6 +31,7 @@ class Camera {
   public:
     Camera(const vec3 &pos);
     mat4 ViewMat() const;
+    mat4 ViewBackMat() const;
     void ProcessKeyBoard(Movement move, float deltaTime);
     void ProcessCursorPos(float offsetX, float offsetY);
     void ProcessScroll(float offsetY);

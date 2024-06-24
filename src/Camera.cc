@@ -8,6 +8,10 @@ mat4 Camera::ViewMat() const {
     return glm::lookAt(position, position + front, up);
 }
 
+mat4 Camera::ViewBackMat() const {
+    return glm::lookAt(position, position - front, up);
+}
+
 void Camera::ProcessKeyBoard(Movement move, float deltaTime) {
     vec3 movVec;
     float movDis = deltaTime * moveSpeed;

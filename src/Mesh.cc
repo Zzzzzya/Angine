@@ -77,13 +77,8 @@ void Mesh::setupMesh() {
     glBindVertexArray(0);
 }
 
-QuadMesh2D::QuadMesh2D() {
-    vertice.push_back({vec2(-1.0f, 1.0f), vec2(0.0f, 1.0f)});
-    vertice.push_back({vec2(-1.0f, -1.0f), vec2(0.0f, 0.0f)});
-    vertice.push_back({vec2(1.0f, -1.0f), vec2(1.0f, 0.0f)});
-    vertice.push_back({vec2(-1.0f, 1.0f), vec2(0.0f, 1.0f)});
-    vertice.push_back({vec2(1.0f, -1.0f), vec2(1.0f, 0.0f)});
-    vertice.push_back({vec2(1.0f, 1.0f), vec2(1.0f, 1.0f)});
+QuadMesh2D::QuadMesh2D(const vector<Vertex2D> &vers) : vertice(vers) {
+
     setupQuadMesh();
 }
 

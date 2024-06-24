@@ -31,7 +31,15 @@ int imageHeight = 900;
 
 /* 场景 */
 shared_ptr<Scene> scene = std::make_shared<Scene>();
+
+vector<Vertex2D> ScreenVertex2D = {{vec2(-1.0f, 1.0f), vec2(0.0f, 1.0f)}, {vec2(-1.0f, -1.0f), vec2(0.0f, 0.0f)},
+                                   {vec2(1.0f, -1.0f), vec2(1.0f, 0.0f)}, {vec2(-1.0f, 1.0f), vec2(0.0f, 1.0f)},
+                                   {vec2(1.0f, -1.0f), vec2(1.0f, 0.0f)}, {vec2(1.0f, 1.0f), vec2(1.0f, 1.0f)}};
+vector<Vertex2D> BackMirrorVertex2D = {{vec2(-0.5f, 1.0f), vec2(0.0f, 1.0f)}, {vec2(-0.5f, 0.5f), vec2(0.0f, 0.0f)},
+                                       {vec2(0.5f, 0.5f), vec2(1.0f, 0.0f)},  {vec2(-0.5f, 1.0f), vec2(0.0f, 1.0f)},
+                                       {vec2(0.5f, 0.5f), vec2(1.0f, 0.0f)},  {vec2(0.5f, 1.0f), vec2(1.0f, 1.0f)}};
 shared_ptr<QuadMesh2D> quadMesh;
+shared_ptr<QuadMesh2D> backMirror;
 
 /* 帧渲染时间 */
 float deltaTime = 0;
@@ -213,7 +221,8 @@ int main(int argc, char **argv) {
         绑定帧缓冲 --> 渲染到这个帧缓冲上
         绑定默认的帧缓冲 --> 绘制一个整个屏幕的四边形 将帧缓冲的颜色缓冲作为他的纹理
     */
-    quadMesh = std::make_shared<QuadMesh2D>();
+    quadMesh = std::make_shared<QuadMesh2D>(ScreenVertex2D);
+    backMirror = std::make_shared<QuadMesh2D>(BackMirrorVertex2D);
     /*
      😍 因此我们要建立一个四边形的Mesh 👆
     */
@@ -321,8 +330,40 @@ int main(int argc, char **argv) {
         glBindVertexArray(quadMesh->VAO);
         glBindTexture(GL_TEXTURE_2D, texColorBuffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(quadMesh->VAO);
+        glBindVertexArray(0);
 
+        // // ------------  State 3 ------------- 渲染至帧缓冲 👌👌👌👌
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer); /* 🫣 绑定帧缓冲*/
+
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_STENCIL_TEST);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glEnable(GL_CULL_FACE);
+
+        glClearColor(1.0f, 1.0f, 0.60f, 1.00f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        view = scene->camera->ViewBackMat();
+        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
+
+        // 渲染
+        MainRender(view, projection);
+        // // --------------- State 3 End -----------------
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); //  解绑 返回默认帧缓冲
+
+        // --------------- State 2 ---------- 渲染到屏幕上
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_STENCIL_TEST);
+        glDisable(GL_CULL_FACE);
+
+        // glClearColor(1.0f, 1.0f, 1.0f, 1.00f);
+        // glClear(GL_COLOR_BUFFER_BIT);
+
+        ScreenShader->use();
+        glBindVertexArray(backMirror->VAO);
+        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(0);
         // END Myrender
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
