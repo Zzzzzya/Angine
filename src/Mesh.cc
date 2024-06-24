@@ -76,3 +76,35 @@ void Mesh::setupMesh() {
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int), &indices[0], GL_STATIC_DRAW);
     glBindVertexArray(0);
 }
+
+QuadMesh2D::QuadMesh2D() {
+    vertice.push_back({vec2(-1.0f, 1.0f), vec2(0.0f, 1.0f)});
+    vertice.push_back({vec2(-1.0f, -1.0f), vec2(0.0f, 0.0f)});
+    vertice.push_back({vec2(1.0f, -1.0f), vec2(1.0f, 0.0f)});
+    vertice.push_back({vec2(-1.0f, 1.0f), vec2(0.0f, 1.0f)});
+    vertice.push_back({vec2(1.0f, -1.0f), vec2(1.0f, 0.0f)});
+    vertice.push_back({vec2(1.0f, 1.0f), vec2(1.0f, 1.0f)});
+    setupQuadMesh();
+}
+
+void QuadMesh2D::Draw(shared_ptr<Shader> &Shader) {
+    Shader->use();
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
+void QuadMesh2D::setupQuadMesh() {
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertice.size() * sizeof(Vertex2D), &vertice[0], GL_STATIC_DRAW);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex2D), (void *)offsetof(Vertex2D, position));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex2D), (void *)offsetof(Vertex2D, texCoords));
+
+    glBindVertexArray(0);
+}

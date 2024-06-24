@@ -31,6 +31,7 @@ int imageHeight = 900;
 
 /* 场景 */
 shared_ptr<Scene> scene = std::make_shared<Scene>();
+shared_ptr<QuadMesh2D> quadMesh;
 
 /* 帧渲染时间 */
 float deltaTime = 0;
@@ -58,13 +59,24 @@ int current_light_index = -1;
 float fps = 0.0f;
 
 /* Shaders */
+/* Light */
 shared_ptr<Shader> LightShader;
+/* Special */
 shared_ptr<Shader> BorderShader;
-shared_ptr<Shader> EmptyPhoneShader;
-shared_ptr<Shader> PhoneShader;
 shared_ptr<Shader> NormalShader;
 shared_ptr<Shader> ZdepthShader;
+/* Reality */
+shared_ptr<Shader> EmptyPhoneShader;
+shared_ptr<Shader> PhoneShader;
+/* Screen */
+shared_ptr<Shader> ScreenNothing;
+shared_ptr<Shader> ScreenBlur;
+shared_ptr<Shader> ScreenGrayScale;
+shared_ptr<Shader> ScreenSharpen;
+
 vector<shared_ptr<Shader>> MyShaders;
+/* actual screenShader we r using */
+shared_ptr<Shader> ScreenShader;
 
 auto ProcessKeyInput = [](GLFWwindow *window) -> void {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -121,6 +133,9 @@ void AppModelEdit();
 void AppLightList();
 void AppLightEdit();
 
+/* 渲染过程！！ 🤩🤩🤩🤩🤩 */
+void MainRender(const mat4 &, const mat4 &);
+
 int main(int argc, char **argv) {
     // Setup window
     glfwSetErrorCallback(glfw_error_callback);
@@ -164,15 +179,61 @@ int main(int argc, char **argv) {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_STENCIL_TEST);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    glEnable(GL_CULL_FACE);
+
+    // 帧缓冲
+    // 1. 创建一个帧缓冲
+    unsigned int framebuffer;
+    glGenFramebuffers(1, &framebuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+    // 2. 创建一个纹理图像 - 这个帧缓冲会渲染到这个纹理图像上
+    unsigned int texColorBuffer;
+    glGenTextures(1, &texColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE,
+                 NULL); // 开内存 没赋值
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    // 3.将纹理附加到当前帧缓冲上，这样帧缓冲就会渲染到这个纹理上了
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
+    // 4.创建一个渲染缓冲
+    unsigned int rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, imageWidth, imageHeight);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    // 5.把渲染缓冲对象附加到帧缓冲的深度和模板附件上
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+    // 6.检查帧缓冲是否完整 否则打印错误信息。
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    /*😆 帧缓冲使用过程：
+        绑定帧缓冲 --> 渲染到这个帧缓冲上
+        绑定默认的帧缓冲 --> 绘制一个整个屏幕的四边形 将帧缓冲的颜色缓冲作为他的纹理
+    */
+    quadMesh = std::make_shared<QuadMesh2D>();
+    /*
+     😍 因此我们要建立一个四边形的Mesh 👆
+    */
 
     /* Shaders 🤣 初始化*/
-    BorderShader = std::make_shared<Shader>("Border.vs", "Border.fs");
-    LightShader = std::make_shared<Shader>("MVP_3.vs", "Light.fs");
-    EmptyPhoneShader = std::make_shared<Shader>("MVP_3.vs", "Empty_Blinn_Phone.fs");
-    PhoneShader = std::make_shared<Shader>("MVP_3.vs", "Blinn_Phone.fs");
-    NormalShader = std::make_shared<Shader>("MVP_3.vs", "Normal.fs");
-    ZdepthShader = std::make_shared<Shader>("MVP_depth.vs", "Z-Depth.fs");
+    LightShader = std::make_shared<Shader>("MVP_3.vs", "Light/Light.fs");
 
+    BorderShader = std::make_shared<Shader>("Border.vs", "Special/Border.fs");
+    NormalShader = std::make_shared<Shader>("MVP_3.vs", "Special/Normal.fs");
+    ZdepthShader = std::make_shared<Shader>("MVP_depth.vs", "Special/Z-Depth.fs");
+
+    EmptyPhoneShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/Empty_Blinn_Phone.fs");
+    PhoneShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/Blinn_Phone.fs");
+
+    ScreenNothing = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Nothing_vec2.fs");
+    ScreenBlur = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Blur.fs");
+    ScreenGrayScale = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/GrayScale.fs");
+    ScreenSharpen = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Sharpen.fs");
+
+    ScreenShader = ScreenNothing;
     MyShaders.push_back(PhoneShader);
     MyShaders.push_back(ZdepthShader);
     MyShaders.push_back(NormalShader);
@@ -186,7 +247,7 @@ int main(int argc, char **argv) {
     scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
     // // 相机创建！
 
-    scene->camera = std::make_shared<Camera>(vec3(0.0f, 5.0f, 5.0f));
+    scene->camera = std::make_shared<Camera>(vec3(0.0f, 5.0f, 10.0f));
 
     PointLight theLight;
     theLight.position = vec3(0.0f, 5.0f, -3.0f);
@@ -228,6 +289,14 @@ int main(int argc, char **argv) {
         glViewport(0, 0, display_w, display_h);
 
         // MYrender
+        // ------------  State 1 ------------- 渲染至帧缓冲 👌👌👌👌
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer); /* 🫣 绑定帧缓冲*/
+
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_STENCIL_TEST);
+        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+        glEnable(GL_CULL_FACE);
+
         glClearColor(0.45f, 0.35f, 0.60f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
@@ -235,71 +304,24 @@ int main(int argc, char **argv) {
         view = scene->camera->ViewMat();
         projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
 
-        int lightIndex = 0;
-        glStencilMask(0x00);
-        glStencilFunc(GL_ALWAYS, 1, 0xFF);
-        for (auto &light : scene->pointLights) {
-            light->updatePosition(curTime);
-            light->shader->use();
-            light->shader->setMVPS(light->ModelMat(), view, projection);
-            light->Draw();
-        }
+        // 渲染
+        MainRender(view, projection);
+        // --------------- State 1 End -----------------
+        glBindFramebuffer(GL_FRAMEBUFFER, 0); //  解绑 返回默认帧缓冲
 
-        int modelIndex = 0;
-        glStencilMask(0x00);
-        glStencilFunc(GL_ALWAYS, 1, 0xFF);
-        for (auto &model : scene->models) {
-            if (modelIndex++ == current_model_index) {
-                continue;
-            }
-            glStencilMask(0x00);
-            glStencilFunc(GL_ALWAYS, 1, 0xFF);
-            model->shader->use();
-            model->shader->setMVPS(model->ModelMat(), view, projection);
-            model->shader->setCam(scene->camera);
-            // 多光源设置
-            model->shader->setInt("lightNum", scene->pointLights.size());
-            for (int i = 0; i < scene->pointLights.size(); i++) {
-                model->shader->setPointLight(i, scene->pointLights[i]->light);
-            }
-            model->shader->setMaterial(model->mat);
-            model->shader->setVec4("ObjectColor", model->ObjectColor);
-            model->Draw();
-            glStencilMask(0xFF);
-        }
+        // --------------- State 2 ---------- 渲染到屏幕上
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_STENCIL_TEST);
+        glDisable(GL_CULL_FACE);
 
-        if (current_model_index != -1) {
-            auto &model = scene->models[current_model_index];
-            glStencilMask(0xff);
-            glStencilFunc(GL_ALWAYS, 1, 0xff);
-            model->shader->use();
-            model->shader->setMVPS(model->ModelMat(), view, projection);
-            model->shader->setCam(scene->camera);
-            // 多光源设置
-            model->shader->setInt("lightNum", scene->pointLights.size());
-            for (int i = 0; i < scene->pointLights.size(); i++) {
-                model->shader->setPointLight(i, scene->pointLights[i]->light);
-            }
-            model->shader->setMaterial(model->mat);
-            model->shader->setVec4("ObjectColor", model->ObjectColor);
-            model->Draw();
+        glClearColor(1.0f, 1.0f, 1.0f, 1.00f);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-            // 绘制边框
-            auto preShader = model->shader;
-            model->shader = BorderShader;
-            glStencilMask(0x00);
-            glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
-            glDisable(GL_DEPTH_TEST);
+        ScreenShader->use();
+        glBindVertexArray(quadMesh->VAO);
+        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
-            model->shader->use();
-            model->shader->setMVPS(model->ModelMat(), view, projection);
-            model->Draw();
-            model->shader = preShader;
-
-            glStencilMask(0xFF);
-            glStencilFunc(GL_ALWAYS, 1, 0x00);
-            glEnable(GL_DEPTH_TEST);
-        }
         // END Myrender
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -321,6 +343,76 @@ int main(int argc, char **argv) {
     return 0;
 }
 
+/* Render */
+void MainRender(const mat4 &view, const mat4 &projection) {
+    int lightIndex = 0;
+    glStencilMask(0x00);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    for (auto &light : scene->pointLights) {
+        light->updatePosition(curTime);
+        light->shader->use();
+        light->shader->setMVPS(light->ModelMat(), view, projection);
+        light->Draw();
+    }
+
+    int modelIndex = 0;
+    glStencilMask(0x00);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    for (auto &model : scene->models) {
+        if (modelIndex++ == current_model_index) {
+            continue;
+        }
+        glStencilMask(0x00);
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        model->shader->use();
+        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->shader->setCam(scene->camera);
+        // 多光源设置
+        model->shader->setInt("lightNum", scene->pointLights.size());
+        for (int i = 0; i < scene->pointLights.size(); i++) {
+            model->shader->setPointLight(i, scene->pointLights[i]->light);
+        }
+        model->shader->setMaterial(model->mat);
+        model->shader->setVec4("ObjectColor", model->ObjectColor);
+        model->Draw();
+        glStencilMask(0xFF);
+    }
+
+    if (current_model_index != -1) {
+        auto &model = scene->models[current_model_index];
+        glStencilMask(0xff);
+        glStencilFunc(GL_ALWAYS, 1, 0xff);
+        model->shader->use();
+        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->shader->setCam(scene->camera);
+        // 多光源设置
+        model->shader->setInt("lightNum", scene->pointLights.size());
+        for (int i = 0; i < scene->pointLights.size(); i++) {
+            model->shader->setPointLight(i, scene->pointLights[i]->light);
+        }
+        model->shader->setMaterial(model->mat);
+        model->shader->setVec4("ObjectColor", model->ObjectColor);
+        model->Draw();
+
+        // 绘制边框
+        auto preShader = model->shader;
+        model->shader = BorderShader;
+        glStencilMask(0x00);
+        glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
+        glDisable(GL_DEPTH_TEST);
+
+        model->shader->use();
+        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->Draw();
+        model->shader = preShader;
+
+        glStencilMask(0xFF);
+        glStencilFunc(GL_ALWAYS, 1, 0x00);
+        glEnable(GL_DEPTH_TEST);
+    }
+}
+
+/* ImGui */
 /*
     主功能界面：
     包括：   进入摄像机
@@ -365,6 +457,21 @@ void AppMainFunction() {
         scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
         scene->pointLights[scene->pointLights.size() - 1]->name =
             "Light" + std::to_string(scene->pointLights.size() - 1);
+    }
+
+    if (ImGui::CollapsingHeader("Screen Effects")) {
+        if (ImGui::Button("Nothing")) {
+            ScreenShader = ScreenNothing;
+        }
+        if (ImGui::Button("Blur")) {
+            ScreenShader = ScreenBlur;
+        }
+        if (ImGui::Button("GrayScale")) {
+            ScreenShader = ScreenGrayScale;
+        }
+        if (ImGui::Button("Sharpen")) {
+            ScreenShader = ScreenSharpen;
+        }
     }
 
     ImGui::End();

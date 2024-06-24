@@ -29,4 +29,20 @@ class Mesh {
     void setupMesh();
 };
 
+struct Vertex2D {
+    vec2 position;
+    vec2 texCoords;
+};
+
+class QuadMesh2D {
+  public:
+    vector<Vertex2D> vertice;
+    unsigned int VAO, VBO;
+    QuadMesh2D();
+    void Draw(shared_ptr<Shader> &Shader);
+
+  private:
+    void setupQuadMesh();
+};
+
 #endif
