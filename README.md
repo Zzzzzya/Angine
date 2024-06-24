@@ -24,7 +24,7 @@ An render engine using opengl and imgui. Just for learning!
 ### 高级Opengl篇
 - 帧缓冲后处理
   - 模糊
-    ![img](res/output/gifs/Blur.jpg)
+    ![img](res/output/gifs/blur.jpg)
   - 锐化
     ![img](res/output/gifs/Sharpen.jpg)
   - 灰度
