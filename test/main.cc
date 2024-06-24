@@ -321,6 +321,7 @@ int main(int argc, char **argv) {
         glBindVertexArray(quadMesh->VAO);
         glBindTexture(GL_TEXTURE_2D, texColorBuffer);
         glDrawArrays(GL_TRIANGLES, 0, 6);
+        glBindVertexArray(quadMesh->VAO);
 
         // END Myrender
 
@@ -449,7 +450,8 @@ void AppMainFunction() {
             strncpy_s(filepath, sizeof(filepath), szFile, _TRUNCATE);
             string file = string(filepath);
             replaceBackslashWithForwardslash(file);
-            scene->models.emplace_back(std::make_shared<Model>(file, LightShader, 1));
+            scene->models.emplace_back(std::make_shared<Model>(file, PhoneShader, 1));
+            current_model_index = 0;
         }
     }
 
