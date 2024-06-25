@@ -54,6 +54,7 @@ void Mesh::Draw(shared_ptr<Shader> &shader) {
         glActiveTexture(GL_TEXTURE0 + i);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
+    glActiveTexture(GL_TEXTURE0);
 }
 
 void Mesh::setupMesh() {

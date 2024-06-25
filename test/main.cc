@@ -281,8 +281,9 @@ int main(int argc, char **argv) {
     /* 甘🐟和地板 🥵🥵🥵 */
     // scene->models.push_back(std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", PhoneShader));
     // scene->models[0]->scale = vec3(0.5);
-    // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PhoneShader));
-    scene->models.push_back(std::make_shared<Model>("quad/quadt.obj", ReflectShader));
+    // scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", RefractShader));
+    scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PhoneShader));
+    // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", ReflectShader));
 
     scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
     scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
