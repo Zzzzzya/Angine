@@ -31,6 +31,22 @@ int imageHeight = 900;
 
 /* 场景 */
 shared_ptr<Scene> scene = std::make_shared<Scene>();
+shared_ptr<CubeMap> skybox;
+shared_ptr<ArrayMesh> skyboxArrayMesh;
+
+vector<Vertex> skyboxVertex = {
+    {{-1.0f, 1.0f, -1.0f}, {}, {}},  {{-1.0f, -1.0f, -1.0f}, {}, {}}, {{1.0f, -1.0f, -1.0f}, {}, {}},
+    {{-1.0f, 1.0f, -1.0f}, {}, {}},  {{1.0f, -1.0f, -1.0f}, {}, {}},  {{1.0f, 1.0f, -1.0f}, {}, {}},
+    {{-1.0f, -1.0f, 1.0f}, {}, {}},  {{-1.0f, -1.0f, -1.0f}, {}, {}}, {{-1.0f, 1.0f, -1.0f}, {}, {}},
+    {{-1.0f, 1.0f, -1.0f}, {}, {}},  {{-1.0f, 1.0f, 1.0f}, {}, {}},   {{-1.0f, -1.0f, 1.0f}, {}, {}},
+    {{1.0f, -1.0f, -1.0f}, {}, {}},  {{1.0f, -1.0f, 1.0f}, {}, {}},   {{1.0f, 1.0f, 1.0f}, {}, {}},
+    {{1.0f, 1.0f, 1.0f}, {}, {}},    {{1.0f, 1.0f, -1.0f}, {}, {}},   {{1.0f, -1.0f, -1.0f}, {}, {}},
+    {{-1.0f, -1.0f, 1.0f}, {}, {}},  {{-1.0f, 1.0f, 1.0f}, {}, {}},   {{1.0f, 1.0f, 1.0f}, {}, {}},
+    {{1.0f, 1.0f, 1.0f}, {}, {}},    {{1.0f, -1.0f, 1.0f}, {}, {}},   {{-1.0f, -1.0f, 1.0f}, {}, {}},
+    {{-1.0f, 1.0f, -1.0f}, {}, {}},  {{1.0f, 1.0f, -1.0f}, {}, {}},   {{1.0f, 1.0f, 1.0f}, {}, {}},
+    {{1.0f, 1.0f, 1.0f}, {}, {}},    {{-1.0f, 1.0f, 1.0f}, {}, {}},   {{-1.0f, 1.0f, -1.0f}, {}, {}},
+    {{-1.0f, -1.0f, -1.0f}, {}, {}}, {{-1.0f, -1.0f, 1.0f}, {}, {}},  {{1.0f, -1.0f, -1.0f}, {}, {}},
+    {{1.0f, -1.0f, -1.0f}, {}, {}},  {{-1.0f, -1.0f, 1.0f}, {}, {}},  {{1.0f, -1.0f, 1.0f}, {}, {}}};
 
 vector<Vertex2D> ScreenVertex2D = {{vec2(-1.0f, 1.0f), vec2(0.0f, 1.0f)}, {vec2(-1.0f, -1.0f), vec2(0.0f, 0.0f)},
                                    {vec2(1.0f, -1.0f), vec2(1.0f, 0.0f)}, {vec2(-1.0f, 1.0f), vec2(0.0f, 1.0f)},
@@ -73,9 +89,13 @@ shared_ptr<Shader> LightShader;
 shared_ptr<Shader> BorderShader;
 shared_ptr<Shader> NormalShader;
 shared_ptr<Shader> ZdepthShader;
+shared_ptr<Shader> SkyboxShader;
+shared_ptr<Shader> ReflectShader;
+shared_ptr<Shader> RefractShader;
 /* Reality */
 shared_ptr<Shader> EmptyPhoneShader;
 shared_ptr<Shader> PhoneShader;
+shared_ptr<Shader> BlinnPhongShader;
 /* Screen */
 shared_ptr<Shader> ScreenNothing;
 shared_ptr<Shader> ScreenBlur;
@@ -85,6 +105,10 @@ shared_ptr<Shader> ScreenSharpen;
 vector<shared_ptr<Shader>> MyShaders;
 /* actual screenShader we r using */
 shared_ptr<Shader> ScreenShader;
+
+/* 天空盒路径 */
+vector<string> faces = {"skybox/right.jpg",  "skybox/left.jpg",  "skybox/top.jpg",
+                        "skybox/bottom.jpg", "skybox/front.jpg", "skybox/back.jpg"};
 
 auto ProcessKeyInput = [](GLFWwindow *window) -> void {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
@@ -227,15 +251,18 @@ int main(int argc, char **argv) {
      😍 因此我们要建立一个四边形的Mesh 👆
     */
 
-    /* Shaders 🤣 初始化*/
+    /* SShaders 🤣 初始化*/
     LightShader = std::make_shared<Shader>("MVP_3.vs", "Light/Light.fs");
 
     BorderShader = std::make_shared<Shader>("Border.vs", "Special/Border.fs");
     NormalShader = std::make_shared<Shader>("MVP_3.vs", "Special/Normal.fs");
     ZdepthShader = std::make_shared<Shader>("MVP_depth.vs", "Special/Z-Depth.fs");
+    SkyboxShader = std::make_shared<Shader>("SkyBox.vs", "Special/SkyBox.fs");
+    ReflectShader = std::make_shared<Shader>("reflect.vs", "Special/reflect.fs");
+    RefractShader = std::make_shared<Shader>("reflect.vs", "Special/refract.fs");
 
-    EmptyPhoneShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/Empty_Blinn_Phone.fs");
-    PhoneShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/Blinn_Phone.fs");
+    BlinnPhongShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/BlinnPhong.fs");
+    PhoneShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/Phone.fs");
 
     ScreenNothing = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Nothing_vec2.fs");
     ScreenBlur = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Blur.fs");
@@ -243,14 +270,19 @@ int main(int argc, char **argv) {
     ScreenSharpen = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Sharpen.fs");
 
     ScreenShader = ScreenNothing;
+    MyShaders.push_back(BlinnPhongShader);
     MyShaders.push_back(PhoneShader);
     MyShaders.push_back(ZdepthShader);
     MyShaders.push_back(NormalShader);
     MyShaders.push_back(LightShader);
+    MyShaders.push_back(ReflectShader);
+    MyShaders.push_back(RefractShader);
 
-    scene->models.push_back(std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", PhoneShader));
-    scene->models[0]->scale = vec3(0.5);
-    scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PhoneShader));
+    /* 甘🐟和地板 🥵🥵🥵 */
+    // scene->models.push_back(std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", PhoneShader));
+    // scene->models[0]->scale = vec3(0.5);
+    // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PhoneShader));
+    scene->models.push_back(std::make_shared<Model>("quad/quadt.obj", ReflectShader));
 
     scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
     scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
@@ -259,13 +291,17 @@ int main(int argc, char **argv) {
     scene->camera = std::make_shared<Camera>(vec3(0.0f, 5.0f, 10.0f));
 
     PointLight theLight;
-    theLight.position = vec3(0.0f, 5.0f, -3.0f);
+    theLight.position = vec3(0.0f, 5.0f, 8.0f);
     theLight.ambient = vec3(0.2f, 0.2f, 0.2f);
     theLight.diffuse = vec3(0.5f, 0.5f, 0.5f);
     theLight.specular = vec3(1.0f, 1.0f, 1.0f);
     theLight.ones = 0.03;
     theLight.secs = 0.003;
     scene->pointLights[0]->light = theLight;
+
+    /* 🫣 天空盒 */
+    skybox = std::make_shared<CubeMap>(faces);
+    skyboxArrayMesh = std::make_shared<ArrayMesh>(skyboxVertex);
 
     int frameCount = 0;
     // Main loop
@@ -296,25 +332,38 @@ int main(int argc, char **argv) {
         if (display_h < 1)
             display_h = 1;
         glViewport(0, 0, display_w, display_h);
+        mat4 projection(1.0f), view(1.0f), object(1.0f);
+        view = scene->camera->ViewMat();
+        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
 
         // MYrender
         // ------------  State 1 ------------- 渲染至帧缓冲 👌👌👌👌
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer); /* 🫣 绑定帧缓冲*/
+        glClearColor(0.45f, 0.35f, 0.60f, 1.00f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
+        // 绘制天空盒
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_STENCIL_TEST);
+        glDisable(GL_CULL_FACE);
+        SkyboxShader->use();
+        SkyboxShader->setMat4("view", mat4(glm::mat3(view)));
+        SkyboxShader->setMat4("projection", projection);
+        SkyboxShader->setInt("skybox", 0);
+        glBindVertexArray(skyboxArrayMesh->VAO);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, skybox->id);
+        glDrawArrays(GL_TRIANGLES, 0, 36);
+        glDepthMask(GL_TRUE);
+        glBindVertexArray(0);
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_STENCIL_TEST);
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         glEnable(GL_CULL_FACE);
 
-        glClearColor(0.45f, 0.35f, 0.60f, 1.00f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-        mat4 projection(1.0f), view(1.0f), object(1.0f);
-        view = scene->camera->ViewMat();
-        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
-
         // 渲染
         MainRender(view, projection);
+
         // --------------- State 1 End -----------------
         glBindFramebuffer(GL_FRAMEBUFFER, 0); //  解绑 返回默认帧缓冲
 
@@ -332,38 +381,6 @@ int main(int argc, char **argv) {
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
 
-        // // ------------  State 3 ------------- 渲染至帧缓冲 👌👌👌👌
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer); /* 🫣 绑定帧缓冲*/
-
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_STENCIL_TEST);
-        glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-        glEnable(GL_CULL_FACE);
-
-        glClearColor(1.0f, 1.0f, 0.60f, 1.00f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
-
-        view = scene->camera->ViewBackMat();
-        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
-
-        // 渲染
-        MainRender(view, projection);
-        // // --------------- State 3 End -----------------
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); //  解绑 返回默认帧缓冲
-
-        // --------------- State 2 ---------- 渲染到屏幕上
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_STENCIL_TEST);
-        glDisable(GL_CULL_FACE);
-
-        // glClearColor(1.0f, 1.0f, 1.0f, 1.00f);
-        // glClear(GL_COLOR_BUFFER_BIT);
-
-        ScreenShader->use();
-        glBindVertexArray(backMirror->VAO);
-        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glBindVertexArray(0);
         // END Myrender
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -404,7 +421,6 @@ void MainRender(const mat4 &view, const mat4 &projection) {
         if (modelIndex++ == current_model_index) {
             continue;
         }
-        glStencilMask(0x00);
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         model->shader->use();
         model->shader->setMVPS(model->ModelMat(), view, projection);
@@ -417,7 +433,6 @@ void MainRender(const mat4 &view, const mat4 &projection) {
         model->shader->setMaterial(model->mat);
         model->shader->setVec4("ObjectColor", model->ObjectColor);
         model->Draw();
-        glStencilMask(0xFF);
     }
 
     if (current_model_index != -1) {
@@ -562,7 +577,8 @@ void AppModelEdit() {
     }
 
     if (ImGui::CollapsingHeader("Shader")) {
-        static const char *shader_items[] = {"Blinn Phone", "Z-depth", "Normal", "Light"};
+        static const char *shader_items[] = {"Blinn Phong", "Phong",   "Z-depth", "Normal",
+                                             "Light",       "Reflect", "Refract"};
         static int current_shader_index = 0;
         if (ImGui::Combo("Select Shader", &current_shader_index, shader_items, IM_ARRAYSIZE(shader_items))) {
             // 当选择发生变化时，执行相应的逻辑
@@ -706,7 +722,8 @@ void AppLightEdit() {
     }
 
     if (ImGui::CollapsingHeader("Shader")) {
-        static const char *shader_items[] = {"Blinn Phone", "Z-depth", "Normal", "Light"};
+        static const char *shader_items[] = {"Blinn Phong", "Phong",   "Z-depth", "Normal",
+                                             "Light",       "Reflect", "Refract"};
         static int current_shader_index = 0;
         if (ImGui::Combo("Select Shader", &current_shader_index, shader_items, IM_ARRAYSIZE(shader_items))) {
             // 当选择发生变化时，执行相应的逻辑

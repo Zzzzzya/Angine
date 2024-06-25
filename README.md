@@ -33,3 +33,10 @@ An render engine using opengl and imgui. Just for learning!
     ![img](res/output/gifs/backmirror.gif)
 - 面剔除
     ![img](res/output/gifs/image.png)
+- 立方体贴图
+  - 天空盒
+    ![img](res/output/gifs/skybox.jpg)
+  - 反射
+    ![img](res/output/gifs/skybox.jpg)
+  - 折射
+    ![img](res/output/gifs/Refract.png)

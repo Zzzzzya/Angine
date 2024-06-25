@@ -162,6 +162,7 @@ void Shader::SetUpShader(const std::string &vertexName, const std::string &fragm
     glGetProgramiv(pro, GL_LINK_STATUS, &success);
     if (!success) {
         glGetProgramInfoLog(pro, 512, NULL, infoLog);
+        std::clog << "Shader: " << pro << std::endl;
         std::clog << "ERROR::LINKING PROGRAM" << std::endl;
         std::clog << infoLog << std::endl;
         glDeleteShader(vertex);

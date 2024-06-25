@@ -22,4 +22,13 @@ class Texture {
     void loadTexture(const std::string &filename, const std::string &directory);
 };
 
+class CubeMap {
+  public:
+    unsigned int id = -1;
+
+    CubeMap(const std::vector<std::string> &paths, const std::string &directory = std::string("../res/textures/"));
+
+  private:
+    void loadCubeMap(const std::vector<std::string> &paths, const std::string &directory);
+};
 #endif

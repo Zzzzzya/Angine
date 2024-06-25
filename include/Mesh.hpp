@@ -29,6 +29,19 @@ class Mesh {
     void setupMesh();
 };
 
+class ArrayMesh {
+  public:
+    unsigned int VAO, VBO;
+    vector<Vertex> vertice;
+    vector<Texture> textures;
+    ArrayMesh(const vector<Vertex> &vertice);
+    ArrayMesh(const vector<Vertex> &vertice, const vector<Texture> &textures);
+    void Draw(shared_ptr<Shader> &Shader);
+
+  private:
+    void setupMesh();
+};
+
 struct Vertex2D {
     vec2 position;
     vec2 texCoords;

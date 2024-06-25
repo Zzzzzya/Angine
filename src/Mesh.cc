@@ -103,3 +103,79 @@ void QuadMesh2D::setupQuadMesh() {
 
     glBindVertexArray(0);
 }
+
+ArrayMesh::ArrayMesh(const vector<Vertex> &vertice) : vertice(vertice), textures(vector<Texture>()) {
+    setupMesh();
+}
+
+ArrayMesh::ArrayMesh(const vector<Vertex> &vertice, const vector<Texture> &textures)
+    : vertice(vertice), textures(textures) {
+    setupMesh();
+}
+
+void ArrayMesh::Draw(shared_ptr<Shader> &Shader) {
+    Shader->use();
+
+    int diffuseNr = 1;
+    int specularNr = 1;
+    int normalNr = 1;
+    int heightNr = 1;
+
+    Shader->setBool("ExistDiffuseTexture", false);
+    Shader->setBool("ExistSpecularTexture", false);
+    Shader->setBool("ExistNormalTexture", false);
+    Shader->setBool("ExistHeightTexture", false);
+
+    // 设置纹理 -> 这里保证shader中各种纹理的命名是这种确定的格式
+    // 在Model自动读入的过程中，会设置纹理的type
+    for (int i = 0; i < textures.size(); i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        std::string number;
+        std::string name = textures[i].type;
+        if (name == "texture_diffuse") {
+            number = std::to_string(diffuseNr++);
+            Shader->setBool("ExistDiffuseTexture", true);
+        }
+        else if (name == "texture_specular") {
+            number = std::to_string(specularNr++);
+            Shader->setBool("ExistSpecularTexture", true);
+        }
+        else if (name == "texture_normal") {
+            number = std::to_string(normalNr++);
+            Shader->setBool("ExistNormalTexture", true);
+        }
+        else if (name == "texture_height") {
+            number = std::to_string(heightNr++);
+            Shader->setBool("ExistHeightTexture", true);
+        }
+
+        Shader->setInt(name + number, i);
+        glBindTexture(GL_TEXTURE_2D, textures[i].id);
+    }
+    glBindVertexArray(VAO);
+    glDrawArrays(GL_TRIANGLES, 0, (unsigned int)vertice.size());
+
+    glBindVertexArray(0);
+    for (int i = 0; i < textures.size(); i++) {
+        glActiveTexture(GL_TEXTURE0 + i);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+}
+
+void ArrayMesh::setupMesh() {
+    glGenVertexArrays(1, &VAO);
+    glGenBuffers(1, &VBO);
+
+    glBindVertexArray(VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertice.size() * sizeof(Vertex), &vertice[0], GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(offsetof(Vertex, position)));
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(offsetof(Vertex, normal)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(offsetof(Vertex, texCoords)));
+
+    glBindVertexArray(0);
+}
