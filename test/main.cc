@@ -158,7 +158,6 @@ auto ProcessCursorPos = [](GLFWwindow *window, double xpos, double ypos) -> void
 
     scene->camera->ProcessCursorPos(offsetx, offsety);
 };
-
 auto ProcessScroll = [](GLFWwindow *window, double xoffset, double yoffset) -> void {
     if (!CursorIsIn)
         return;

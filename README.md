@@ -45,5 +45,6 @@ An render engine using opengl and imgui. Just for learning!
 ### 高级光照
 - 阴影
   - ShadowMapping
-    ![img](res/output/gifs/ShadowMap.jpg)
-  - 
+    ![img](res/output/gifs/ShadowMap.png)
+  - PCF
+    ![img](res/output/gifs/PCF.png)
