@@ -20,12 +20,12 @@ class Mesh {
     vector<Vertex> vertice;
     vector<unsigned int> indices;
     vector<Texture> textures;
+    unsigned int VAO, VBO, EBO;
 
     Mesh(const vector<Vertex> &vertice, const vector<unsigned int> &indices, const vector<Texture> &textures);
     void Draw(shared_ptr<Shader> &Shader);
 
   private:
-    unsigned int VAO, VBO, EBO;
     void setupMesh();
 };
 

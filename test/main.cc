@@ -5,6 +5,7 @@
 #include "Scene.hpp"
 #include <GLFW/glfw3.h>
 #include <Windows.h>
+#include "Buffer.hpp"
 
 using Camera::Movement::BACKWARD;
 using Camera::Movement::FORWARD;
@@ -28,6 +29,8 @@ const std::string ProjectModelsPath = "D:\\Files\\Code\\Graphics\\projects\\MyEn
 /* 窗口大小 */
 int imageWidth = 1600;
 int imageHeight = 900;
+int shadowWidth = 1024;
+int shadowHeight = 1024;
 
 /* 场景 */
 shared_ptr<Scene> scene = std::make_shared<Scene>();
@@ -92,10 +95,12 @@ shared_ptr<Shader> ZdepthShader;
 shared_ptr<Shader> SkyboxShader;
 shared_ptr<Shader> ReflectShader;
 shared_ptr<Shader> RefractShader;
+shared_ptr<Shader> simpleDepthShader;
 /* Reality */
 shared_ptr<Shader> EmptyPhoneShader;
 shared_ptr<Shader> PhoneShader;
 shared_ptr<Shader> BlinnPhongShader;
+shared_ptr<Shader> Phong_ShadowMapShader;
 /* Screen */
 shared_ptr<Shader> ScreenNothing;
 shared_ptr<Shader> ScreenBlur;
@@ -105,6 +110,8 @@ shared_ptr<Shader> ScreenSharpen;
 vector<shared_ptr<Shader>> MyShaders;
 /* actual screenShader we r using */
 shared_ptr<Shader> ScreenShader;
+
+const static mat4 lightProjection = glm::perspective(radians(90.0f), 1.0f, 0.1f, 1000.0f);
 
 /* 天空盒路径 */
 vector<string> faces = {"skybox/right.jpg",  "skybox/left.jpg",  "skybox/top.jpg",
@@ -214,33 +221,8 @@ int main(int argc, char **argv) {
     glEnable(GL_CULL_FACE);
 
     // 帧缓冲
-    // 1. 创建一个帧缓冲
-    unsigned int framebuffer;
-    glGenFramebuffers(1, &framebuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
-    // 2. 创建一个纹理图像 - 这个帧缓冲会渲染到这个纹理图像上
-    unsigned int texColorBuffer;
-    glGenTextures(1, &texColorBuffer);
-    glBindTexture(GL_TEXTURE_2D, texColorBuffer);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, imageWidth, imageHeight, 0, GL_RGB, GL_UNSIGNED_BYTE,
-                 NULL); // 开内存 没赋值
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glBindTexture(GL_TEXTURE_2D, 0);
-    // 3.将纹理附加到当前帧缓冲上，这样帧缓冲就会渲染到这个纹理上了
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texColorBuffer, 0);
-    // 4.创建一个渲染缓冲
-    unsigned int rbo;
-    glGenRenderbuffers(1, &rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, imageWidth, imageHeight);
-    glBindRenderbuffer(GL_RENDERBUFFER, 0);
-    // 5.把渲染缓冲对象附加到帧缓冲的深度和模板附件上
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
-    // 6.检查帧缓冲是否完整 否则打印错误信息。
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    FrameBuffer framebuffer(imageWidth, imageHeight);
+    FrameBufferDepthMap shadowMap(shadowWidth, shadowHeight);
     /*😆 帧缓冲使用过程：
         绑定帧缓冲 --> 渲染到这个帧缓冲上
         绑定默认的帧缓冲 --> 绘制一个整个屏幕的四边形 将帧缓冲的颜色缓冲作为他的纹理
@@ -260,9 +242,11 @@ int main(int argc, char **argv) {
     SkyboxShader = std::make_shared<Shader>("SkyBox.vs", "Special/SkyBox.fs");
     ReflectShader = std::make_shared<Shader>("reflect.vs", "Special/reflect.fs");
     RefractShader = std::make_shared<Shader>("reflect.vs", "Special/refract.fs");
+    simpleDepthShader = std::make_shared<Shader>("simpleDepth.vs", "Special/empty.fs");
 
     BlinnPhongShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/BlinnPhong.fs");
     PhoneShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/Phone.fs");
+    Phong_ShadowMapShader = std::make_shared<Shader>("MVP_4_shadowMap.vs", "HighLevel/Shadow/shadowMap.fs");
 
     ScreenNothing = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Nothing_vec2.fs");
     ScreenBlur = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Blur.fs");
@@ -279,10 +263,11 @@ int main(int argc, char **argv) {
     MyShaders.push_back(RefractShader);
 
     /* 甘🐟和地板 🥵🥵🥵 */
-    // scene->models.push_back(std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", PhoneShader));
-    // scene->models[0]->scale = vec3(0.5);
+    scene->models.push_back(
+        std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", Phong_ShadowMapShader));
+    scene->models[0]->scale = vec3(0.2);
     // scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", RefractShader));
-    scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PhoneShader));
+    scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
     // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", ReflectShader));
 
     scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
@@ -305,6 +290,7 @@ int main(int argc, char **argv) {
     skyboxArrayMesh = std::make_shared<ArrayMesh>(skyboxVertex);
 
     int frameCount = 0;
+
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         curTime = glfwGetTime();
@@ -333,13 +319,45 @@ int main(int argc, char **argv) {
         if (display_h < 1)
             display_h = 1;
         glViewport(0, 0, display_w, display_h);
-        mat4 projection(1.0f), view(1.0f), object(1.0f);
-        view = scene->camera->ViewMat();
-        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
+        mat4 projection(1.0f), view(1.0f);
 
         // MYrender
+        // ---- shadow map ----
+        // shadow map
+        glEnable(GL_DEPTH_TEST);
+
+        glViewport(0, 0, shadowWidth, shadowHeight);
+        glBindFramebuffer(GL_FRAMEBUFFER, shadowMap.depthMapFBO);
+        glClear(GL_DEPTH_BUFFER_BIT);
+
+        vec3 lightFront = vec3(0.0f) - scene->pointLights[0]->light.position;
+        auto right = normalize(glm::cross(lightFront, vec3(0.0f, 1.0f, 0.0f)));
+        vec3 lightUp = normalize(glm::cross(right, lightFront));
+        auto lightView = glm::lookAt(scene->pointLights[0]->light.position, vec3(0.0f), lightUp);
+
+        simpleDepthShader->use();
+        simpleDepthShader->setMat4("lightProjection", lightProjection);
+        simpleDepthShader->setMat4("lightView", lightView);
+
+        for (auto &model : scene->models) {
+            simpleDepthShader->setMat4("model", model->ModelMat());
+            for (auto &mesh : model->meshes) {
+                glBindVertexArray(mesh.VAO);
+                glDrawElements(GL_TRIANGLES, (unsigned int)mesh.indices.size(), GL_UNSIGNED_INT, 0);
+                glBindVertexArray(0);
+            }
+        }
+
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        // shadow map end
+
+        view = scene->camera->ViewMat();
+        projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
         // ------------  State 1 ------------- 渲染至帧缓冲 👌👌👌👌
-        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer); /* 🫣 绑定帧缓冲*/
+        glEnable(GL_FRAMEBUFFER_SRGB);
+
+        glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.FrameBufferID); /* 🫣 绑定帧缓冲*/
+        glViewport(0, 0, display_w, display_h);
         glClearColor(0.45f, 0.35f, 0.60f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
@@ -357,12 +375,16 @@ int main(int argc, char **argv) {
         glDepthMask(GL_TRUE);
         glBindVertexArray(0);
 
+        // 渲染
+
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_STENCIL_TEST);
         glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
         glEnable(GL_CULL_FACE);
 
-        // 渲染
+        glActiveTexture(GL_TEXTURE30);
+        glBindTexture(GL_TEXTURE_2D, shadowMap.depthMapTexture);
+        glActiveTexture(GL_TEXTURE0);
         MainRender(view, projection);
 
         // --------------- State 1 End -----------------
@@ -378,10 +400,14 @@ int main(int argc, char **argv) {
 
         ScreenShader->use();
         glBindVertexArray(quadMesh->VAO);
-        glBindTexture(GL_TEXTURE_2D, texColorBuffer);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, framebuffer.TextureColorBuffer);
+
+        ScreenShader->setInt("screenTexture", 0);
         glDrawArrays(GL_TRIANGLES, 0, 6);
         glBindVertexArray(0);
 
+        glDisable(GL_FRAMEBUFFER_SRGB);
         // END Myrender
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -405,6 +431,85 @@ int main(int argc, char **argv) {
 
 /* Render */
 void MainRender(const mat4 &view, const mat4 &projection) {
+
+    int lightIndex = 0;
+    glStencilMask(0x00);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    for (auto &light : scene->pointLights) {
+        light->updatePosition(curTime);
+        light->shader->use();
+        light->shader->setMVPS(light->ModelMat(), view, projection);
+        light->Draw();
+    }
+
+    int modelIndex = 0;
+    glStencilMask(0x00);
+    glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    for (auto &model : scene->models) {
+        if (modelIndex++ == current_model_index) {
+            continue;
+        }
+        glStencilFunc(GL_ALWAYS, 1, 0xFF);
+        model->shader->use();
+        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->shader->setCam(scene->camera);
+        // 多光源设置
+        model->shader->setInt("lightNum", scene->pointLights.size());
+        for (int i = 0; i < scene->pointLights.size(); i++) {
+            vec3 lightFront = vec3(0.0f) - scene->pointLights[i]->light.position;
+            auto right = normalize(glm::cross(lightFront, vec3(0.0f, 1.0f, 0.0f)));
+            vec3 lightUp = normalize(glm::cross(right, lightFront));
+            auto lightView = glm::lookAt(scene->pointLights[i]->light.position, vec3(0.0f), lightUp);
+            model->shader->setMat4("lightSpaceMatrix", lightProjection * lightView);
+            model->shader->setPointLight(i, scene->pointLights[i]->light);
+        }
+        model->shader->setInt("shadowMap", 30);
+        model->shader->setMaterial(model->mat);
+        model->shader->setVec4("ObjectColor", model->ObjectColor);
+        model->Draw();
+    }
+
+    if (current_model_index != -1) {
+        auto &model = scene->models[current_model_index];
+        glStencilMask(0xff);
+        glStencilFunc(GL_ALWAYS, 1, 0xff);
+        model->shader->use();
+        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->shader->setCam(scene->camera);
+        // 多光源设置
+        model->shader->setInt("lightNum", scene->pointLights.size());
+        for (int i = 0; i < scene->pointLights.size(); i++) {
+            vec3 lightFront = vec3(0.0f) - scene->pointLights[i]->light.position;
+            auto right = normalize(glm::cross(lightFront, vec3(0.0f, 1.0f, 0.0f)));
+            vec3 lightUp = normalize(glm::cross(right, lightFront));
+            auto lightView = glm::lookAt(scene->pointLights[i]->light.position, vec3(0.0f), lightUp);
+            model->shader->setMat4("lightSpaceMatrix", lightProjection * lightView);
+            model->shader->setPointLight(i, scene->pointLights[i]->light);
+        }
+        model->shader->setInt("shadowMap", 30);
+        model->shader->setMaterial(model->mat);
+        model->shader->setVec4("ObjectColor", model->ObjectColor);
+        model->Draw();
+
+        // 绘制边框
+        auto preShader = model->shader;
+        model->shader = BorderShader;
+        glStencilMask(0x00);
+        glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
+        glDisable(GL_DEPTH_TEST);
+
+        model->shader->use();
+        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->Draw();
+        model->shader = preShader;
+
+        glStencilMask(0xFF);
+        glStencilFunc(GL_ALWAYS, 1, 0x00);
+        glEnable(GL_DEPTH_TEST);
+    }
+}
+
+void RenderAll(const mat4 &view, const mat4 &projection) {
     int lightIndex = 0;
     glStencilMask(0x00);
     glStencilFunc(GL_ALWAYS, 1, 0xFF);
@@ -435,41 +540,7 @@ void MainRender(const mat4 &view, const mat4 &projection) {
         model->shader->setVec4("ObjectColor", model->ObjectColor);
         model->Draw();
     }
-
-    if (current_model_index != -1) {
-        auto &model = scene->models[current_model_index];
-        glStencilMask(0xff);
-        glStencilFunc(GL_ALWAYS, 1, 0xff);
-        model->shader->use();
-        model->shader->setMVPS(model->ModelMat(), view, projection);
-        model->shader->setCam(scene->camera);
-        // 多光源设置
-        model->shader->setInt("lightNum", scene->pointLights.size());
-        for (int i = 0; i < scene->pointLights.size(); i++) {
-            model->shader->setPointLight(i, scene->pointLights[i]->light);
-        }
-        model->shader->setMaterial(model->mat);
-        model->shader->setVec4("ObjectColor", model->ObjectColor);
-        model->Draw();
-
-        // 绘制边框
-        auto preShader = model->shader;
-        model->shader = BorderShader;
-        glStencilMask(0x00);
-        glStencilFunc(GL_NOTEQUAL, 1, 0XFF);
-        glDisable(GL_DEPTH_TEST);
-
-        model->shader->use();
-        model->shader->setMVPS(model->ModelMat(), view, projection);
-        model->Draw();
-        model->shader = preShader;
-
-        glStencilMask(0xFF);
-        glStencilFunc(GL_ALWAYS, 1, 0x00);
-        glEnable(GL_DEPTH_TEST);
-    }
 }
-
 /* ImGui */
 /*
     主功能界面：
