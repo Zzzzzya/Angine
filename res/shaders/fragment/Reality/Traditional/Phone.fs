@@ -41,12 +41,20 @@ uniform vec4 ObjectColor;
 
 uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_specular1;
+uniform sampler2D texture_normal1;
 uniform bool ExistDiffuseTexture;
 uniform bool ExistSpecularTexture;
 uniform bool ExistNormalTexture;
 uniform bool ExistHeightTexture;
 
 void main() {
+    vec3 realNormal;
+    if (ExistNormalTexture) {
+        realNormal = normalize(texture(texture_normal1, TexCoords).rgb * 2 - 1.0f);
+    }
+    else {
+        realNormal = normalize(Normal);
+    }
     vec3 result = vec3(0.0f);
     for (int i = 0; i < lightNum; i++) {
         vec3 LightDir = light[i].position - FragPos;
@@ -65,13 +73,13 @@ void main() {
         vec3 ambient = light[i].ambient * diffColor;
 
         // diffuse
-        float diff = max(dot(Normal, NormalLightDir), 0);
+        float diff = max(dot(realNormal, NormalLightDir), 0);
         vec3 diffuse = diff * light[i].diffuse * diffColor;
 
         // specular
         vec3 ViewDir = camera.position - FragPos;
         vec3 NormalViewDir = normalize(ViewDir);
-        vec3 LightReflect = normalize(reflect(-NormalLightDir, Normal));
+        vec3 LightReflect = normalize(reflect(-NormalLightDir, realNormal));
         // vec3 h = normalize(NormalLightDir + NormalViewDir);
         // float spec = pow(max(dot(h,Normal),0.0f),material.shininess);
         float spec = pow(max(dot(LightReflect, NormalViewDir), 0.0f), material.shininess);

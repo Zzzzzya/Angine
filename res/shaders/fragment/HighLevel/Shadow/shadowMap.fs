@@ -44,6 +44,7 @@ uniform vec4 ObjectColor;
 
 uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_specular1;
+uniform sampler2D texture_normal1;
 
 uniform bool ExistDiffuseTexture;
 uniform bool ExistSpecularTexture;
@@ -61,24 +62,33 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 lightDir) {
     float bias = 0.0002f;
     float currentDepth = projCoords.z;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    for (int x = -3; x <= 3; ++x) {
-        for (int y = -3; y <= 3; ++y) {
-            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
-            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
-        }
-    }
-    shadow /= 49.0;
+    // for (int x = -3; x <= 3; ++x) {
+    //     for (int y = -3; y <= 3; ++y) {
+    //         float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+    //         shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+    //     }
+    // }
+    // shadow /= 49.0;
+    shadow = currentDepth - bias > texture(shadowMap, projCoords.xy).r ? 1.0 : 0.0;
     return shadow;
 }
 
 void main() {
+    vec3 realNormal;
+    if (ExistNormalTexture) {
+        realNormal = normalize(texture(texture_normal1, TexCoords).rgb * 2 - 1.0f);
+    }
+    else {
+        realNormal = normalize(Normal);
+    }
+
     vec3 result = vec3(0.0f);
     for (int i = 0; i < lightNum; i++) {
         vec3 LightDir = light[i].position - FragPos;
         vec3 NormalLightDir = normalize(LightDir);
         float LightDis = length(LightDir);
-        float reduce = 1 / (light[i].constant + light[i].ones * LightDis + light[i].secs * LightDis * LightDis);
-
+        // float reduce = 1 / (light[i].constant + light[i].ones * LightDis + light[i].secs * LightDis * LightDis);
+        float reduce = 1.0f;
         // ambient
         vec3 diffColor = vec3(0.0f);
         if (!ExistDiffuseTexture) {
@@ -90,13 +100,13 @@ void main() {
         vec3 ambient = light[i].ambient * diffColor;
 
         // diffuse
-        float diff = max(dot(Normal, NormalLightDir), 0);
+        float diff = max(dot(realNormal, NormalLightDir), 0);
         vec3 diffuse = diff * light[i].diffuse * diffColor;
 
         // specular
         vec3 ViewDir = camera.position - FragPos;
         vec3 NormalViewDir = normalize(ViewDir);
-        vec3 LightReflect = normalize(reflect(-NormalLightDir, Normal));
+        vec3 LightReflect = normalize(reflect(-NormalLightDir, realNormal));
         // vec3 h = normalize(NormalLightDir + NormalViewDir);
         // float spec = pow(max(dot(h,Normal),0.0f),material.shininess);
         float spec = pow(max(dot(LightReflect, NormalViewDir), 0.0f), material.shininess);

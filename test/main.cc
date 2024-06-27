@@ -34,6 +34,8 @@ int shadowHeight = 1024;
 
 /* 场景 */
 shared_ptr<Scene> scene = std::make_shared<Scene>();
+
+bool skyboxOn = false;
 shared_ptr<CubeMap> skybox;
 shared_ptr<ArrayMesh> skyboxArrayMesh;
 
@@ -254,7 +256,7 @@ int main(int argc, char **argv) {
 
     ScreenShader = ScreenNothing;
     MyShaders.push_back(BlinnPhongShader);
-    MyShaders.push_back(PhoneShader);
+    MyShaders.push_back(Phong_ShadowMapShader);
     MyShaders.push_back(ZdepthShader);
     MyShaders.push_back(NormalShader);
     MyShaders.push_back(LightShader);
@@ -262,26 +264,29 @@ int main(int argc, char **argv) {
     MyShaders.push_back(RefractShader);
 
     /* 甘🐟和地板 🥵🥵🥵 */
-    scene->models.push_back(
-        std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", Phong_ShadowMapShader));
-    scene->models[0]->scale = vec3(0.2);
+    // scene->models.push_back(
+    //     std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", Phong_ShadowMapShader));
+    // scene->models[0]->scale = vec3(0.2);
     // scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", RefractShader));
+    scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", Phong_ShadowMapShader));
     scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
     // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", ReflectShader));
 
     scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
     scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
-    // // 相机创建！
+
+    scene->pointLights[scene->pointLights.size() - 1]->scale = vec3(0.1f);
+    //  // 相机创建！
 
     scene->camera = std::make_shared<Camera>(vec3(0.0f, 5.0f, 10.0f));
 
     PointLight theLight;
-    theLight.position = vec3(0.0f, 5.0f, 8.0f);
-    theLight.ambient = vec3(0.2f, 0.2f, 0.2f);
+    theLight.position = vec3(0.0f, 5.0f, 3.0f);
+    theLight.ambient = vec3(0.0f, 0.0f, 0.0f);
     theLight.diffuse = vec3(0.5f, 0.5f, 0.5f);
     theLight.specular = vec3(1.0f, 1.0f, 1.0f);
-    theLight.ones = 0.03;
-    theLight.secs = 0.003;
+    theLight.ones = 0.00;
+    theLight.secs = 0.00;
     scene->pointLights[0]->light = theLight;
 
     /* 🫣 天空盒 */
@@ -357,23 +362,24 @@ int main(int argc, char **argv) {
 
         glBindFramebuffer(GL_FRAMEBUFFER, framebuffer.FrameBufferID); /* 🫣 绑定帧缓冲*/
         glViewport(0, 0, display_w, display_h);
-        glClearColor(0.45f, 0.35f, 0.60f, 1.00f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // 绘制天空盒
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_STENCIL_TEST);
-        glDisable(GL_CULL_FACE);
-        SkyboxShader->use();
-        SkyboxShader->setMat4("view", mat4(glm::mat3(view)));
-        SkyboxShader->setMat4("projection", projection);
-        SkyboxShader->setInt("skybox", 0);
-        glBindVertexArray(skyboxArrayMesh->VAO);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, skybox->id);
-        glDrawArrays(GL_TRIANGLES, 0, 36);
-        glDepthMask(GL_TRUE);
-        glBindVertexArray(0);
-
+        if (skyboxOn) {
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_STENCIL_TEST);
+            glDisable(GL_CULL_FACE);
+            SkyboxShader->use();
+            SkyboxShader->setMat4("view", mat4(glm::mat3(view)));
+            SkyboxShader->setMat4("projection", projection);
+            SkyboxShader->setInt("skybox", 0);
+            glBindVertexArray(skyboxArrayMesh->VAO);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, skybox->id);
+            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glDepthMask(GL_TRUE);
+            glBindVertexArray(0);
+        }
         // 渲染
 
         glEnable(GL_DEPTH_TEST);
@@ -586,6 +592,10 @@ void AppMainFunction() {
         scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
         scene->pointLights[scene->pointLights.size() - 1]->name =
             "Light" + std::to_string(scene->pointLights.size() - 1);
+    }
+
+    if (ImGui::Button("skyBox switch")) {
+        skyboxOn = !skyboxOn;
     }
 
     if (ImGui::CollapsingHeader("Screen Effects")) {

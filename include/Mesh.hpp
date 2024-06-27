@@ -9,6 +9,8 @@ struct Vertex {
     vec3 position;
     vec3 normal;
     vec2 texCoords;
+
+    vec3 tangent;
 };
 
 class Texture;

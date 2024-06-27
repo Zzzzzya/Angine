@@ -58,8 +58,9 @@ void Model::loadModel(int i, const std::string &filename) {
     Assimp::Importer importer;
     auto path = filename;
 
-    // 读取Scene对象!                              |     自动生成法线     |     自动拆为三角形       |    反转UV |
-    const aiScene *scene = importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs);
+    // 读取Scene对象!                              |     自动生成法线     |     自动拆为三角形       |
+    const aiScene *scene =
+        importer.ReadFile(path, aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_CalcTangentSpace);
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
         std::clog << "ERROR::ASSIMP::" << importer.GetErrorString() << std::endl;
         return;
@@ -100,6 +101,13 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
         }
         else
             v.texCoords = vec2(0.0f);
+
+        if (mesh->mTangents && mesh->mTangents->Length() > i) {
+            auto &mTang = mesh->mTangents[i];
+            v.tangent = vec3(mTang.x, mTang.y, mTang.z);
+        }
+        else
+            v.tangent = vec3(0.0f);
         vertice.push_back(v);
     }
 
@@ -119,6 +127,9 @@ Mesh Model::processMesh(aiMesh *mesh, const aiScene *scene) {
 
         vector<Texture> specularMaps = loadMaterialTextures(material, aiTextureType_SPECULAR, "texture_specular");
         textures.insert(textures.end(), specularMaps.begin(), specularMaps.end());
+
+        vector<Texture> normalMaps = loadMaterialTextures(material, aiTextureType_HEIGHT, "texture_normal");
+        textures.insert(textures.end(), normalMaps.begin(), normalMaps.end());
     }
     return Mesh(vertice, indices, textures);
 }

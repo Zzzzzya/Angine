@@ -2,6 +2,8 @@
 - [目录](#目录)
 - [Angine](#angine)
 - [效果展示](#效果展示)
+  - [Games202](#games202)
+    - [homework0](#homework0)
   - [learnOpengl](#learnopengl)
     - [Basic 基础功能](#basic-基础功能)
     - [高级Opengl篇](#高级opengl篇)
@@ -11,6 +13,13 @@
 An render engine using opengl and imgui. Just for learning!
 
 # 效果展示
+## Games202
+### homework0
+> 环境测试  我就是移植到了自己的渲染器上 \
+> 简单测试了PhongShader & PCF
+> 
+![img](res/output/gifs/games202/homework0.gif)
+
 ## learnOpengl
 ### Basic 基础功能
 - Select Model (模板测试)
