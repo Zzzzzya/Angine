@@ -15,10 +15,20 @@ void Mesh::Draw(shared_ptr<Shader> &shader) {
     int normalNr = 1;
     int heightNr = 1;
 
+    int albedoNr = 1;
+    int metallicNr = 1;
+    int roughnessNr = 1;
+    int aoNr = 1;
+
     shader->setBool("ExistDiffuseTexture", false);
     shader->setBool("ExistSpecularTexture", false);
     shader->setBool("ExistNormalTexture", false);
     shader->setBool("ExistHeightTexture", false);
+
+    shader->setBool("ExistAlbedoTexture", false);
+    shader->setBool("ExistMetallicTexture", false);
+    shader->setBool("ExistRoughnessTexture", false);
+    shader->setBool("ExistAoTexture", false);
 
     // 设置纹理 -> 这里保证shader中各种纹理的命名是这种确定的格式
     // 在Model自动读入的过程中，会设置纹理的type
@@ -41,6 +51,22 @@ void Mesh::Draw(shared_ptr<Shader> &shader) {
         else if (name == "texture_height") {
             number = std::to_string(heightNr++);
             shader->setBool("ExistHeightTexture", true);
+        }
+        else if (name == "texture_albedo") {
+            number = std::to_string(albedoNr++);
+            shader->setBool("ExistAlbedoTexture", true);
+        }
+        else if (name == "texture_metallic") {
+            number = std::to_string(metallicNr++);
+            shader->setBool("ExistMetallicTexture", true);
+        }
+        else if (name == "texture_roughness") {
+            number = std::to_string(roughnessNr++);
+            shader->setBool("ExistRoughnessTexture", true);
+        }
+        else if (name == "texture_ao") {
+            number = std::to_string(heightNr++);
+            shader->setBool("ExistAoTexture", true);
         }
 
         shader->setInt(name + number, i);

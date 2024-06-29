@@ -41,11 +41,19 @@ uniform float roughness;
 uniform float ao;
 
 uniform sampler2D shadowMap;
+uniform sampler2D texture_albedo1;
+uniform sampler2D texture_metallic1;
+uniform sampler2D texture_roughness1;
+uniform sampler2D texture_ao1;
+
+uniform bool ExistAlbedoTexture;
+uniform bool ExistMetallicTexture;
+uniform bool ExistRoughnessTexture;
+uniform bool ExistAoTexture;
+
 uniform sampler2D texture_diffuse1;
 uniform sampler2D texture_specular1;
 uniform sampler2D texture_normal1;
-uniform sampler2D texture_height1;
-
 uniform bool ExistDiffuseTexture;
 uniform bool ExistSpecularTexture;
 uniform bool ExistNormalTexture;
@@ -86,7 +94,26 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float r) {
 }
 
 void main() {
-    vec3 N = normalize(Normal);
+    vec3 the_albedo = albedo;
+    float the_metallic = metallic;
+    float the_ao = 1.0f;
+    float the_roughness = roughness;
+    vec3 normal = Normal;
+
+    if (ExistAlbedoTexture) {
+        the_albedo.r = pow(texture(texture_albedo1, TexCoords).r, 2.2);
+        the_albedo.g = pow(texture(texture_albedo1, TexCoords).g, 2.2);
+        the_albedo.b = pow(texture(texture_albedo1, TexCoords).b, 2.2);
+    }
+
+    if (ExistMetallicTexture)
+        the_metallic = texture(texture_metallic1, TexCoords).r;
+    if (ExistRoughnessTexture)
+        the_roughness = texture(texture_roughness1, TexCoords).r;
+    if (ExistAoTexture)
+        the_ao = texture(texture_ao1, TexCoords).r;
+
+    vec3 N = normalize(normal);
     vec3 V = normalize(camera.position - FragPos);
 
     vec3 Lo = vec3(0.0f);
@@ -100,11 +127,11 @@ void main() {
         float attenuation = 1.0f / (lightDis * lightDis);
         vec3 radiance = light[i].color * attenuation;
 
-        float NDF = DistributionGGX(N, H, roughness);
-        float G = GeometrySmith(N, V, Li, roughness);
+        float NDF = DistributionGGX(N, H, the_roughness);
+        float G = GeometrySmith(N, V, Li, the_roughness);
 
         vec3 F0 = vec3(0.04);
-        F0 = mix(F0, albedo, metallic);
+        F0 = mix(F0, the_albedo, the_metallic);
         vec3 F = fresnelShlick(max(dot(H, V), 0.0f), F0);
 
         vec3 nominator = NDF * G * F;
@@ -112,18 +139,18 @@ void main() {
 
         vec3 kS = F;
         vec3 kD = vec3(1.0f) - kS;
-        kD *= 1.0f - metallic;
+        kD *= 1.0f - the_metallic;
 
         vec3 specular = nominator / denominator;
-        vec3 diffuse = albedo / PI;
+        vec3 diffuse = the_albedo / PI;
 
         float NdotL = max(dot(N, Li), 0.0f);
         Lo += (kD * diffuse + specular) * radiance * NdotL;
     }
-    vec3 ambient = vec3(0.02) * albedo * ao;
+    vec3 ambient = vec3(0.02) * the_albedo * the_ao;
     vec3 color = ambient + Lo;
-    color = color / (color + vec3(1.0f));
-    color = pow(color, vec3(1.0f / 2.2f));
+    // color = color / (color + vec3(1.0f));
+    // color = pow(color, vec3(1.0f / 2.2f));
 
     FragColor = vec4(color, 1.0f);
 }

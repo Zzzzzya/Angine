@@ -276,6 +276,14 @@ int main(int argc, char **argv) {
     // scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
     // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", ReflectShader));
 
+    Texture albedo("rust/albedo.png");
+    Texture metallic("rust/metallic.png");
+    Texture roughness("rust/roughness.png");
+
+    albedo.type = "texture_albedo";
+    metallic.type = "texture_metallic";
+    roughness.type = "texture_roughness";
+
     int nrRows = 7;
     int nrColumns = 7;
     float spacing = 2.5;
@@ -289,6 +297,10 @@ int main(int argc, char **argv) {
             cur->pbr.ao = 1.0f;
             cur->pbr.roughness = glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f);
             cur->translate = glm::vec3((col - (nrColumns / 2)) * spacing, (row - (nrRows / 2)) * spacing, 0.0f);
+
+            cur->meshes[0].textures.push_back(albedo);
+            cur->meshes[0].textures.push_back(metallic);
+            cur->meshes[0].textures.push_back(roughness);
         }
     }
 
