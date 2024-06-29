@@ -10,6 +10,7 @@
 class Camera;
 class PointLight;
 class Material;
+class PBR;
 class Shader {
   public:
     unsigned int pro = -1;
@@ -41,6 +42,7 @@ class Shader {
     void setCam(shared_ptr<Camera> cam);
     void setPointLight(int i, const PointLight &light);
     void setMaterial(const Material &mat);
+    void setPbr(const PBR &pbr);
 
   private:
     void SetUpShader(const std::string &vertexName, const std::string &fragmentName, const std::string &vertexDirectory,

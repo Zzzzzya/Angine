@@ -4,10 +4,12 @@
 - [效果展示](#效果展示)
   - [Games202](#games202)
     - [homework0](#homework0)
+    - [homework1](#homework1)
   - [learnOpengl](#learnopengl)
     - [Basic 基础功能](#basic-基础功能)
     - [高级Opengl篇](#高级opengl篇)
     - [高级光照](#高级光照)
+    - [PBR](#pbr)
 
 # Angine
 An render engine using opengl and imgui. Just for learning!
@@ -19,6 +21,16 @@ An render engine using opengl and imgui. Just for learning!
 > 简单测试了PhongShader & PCF
 > 
 ![img](res/output/gifs/games202/homework0.gif)
+
+### homework1
+- 1. shadowMap
+  ![img](res/output/gifs/games202/homework1/1.png)
+  > ! 有明显的锯齿边
+  ![img](res/output/gifs/games202/homework1/2.png)
+- 2. PCF
+  ![img](res/output/gifs/games202/homework1/poisson.png)
+- 3. PCSS
+  ![img](res/output/gifs/games202/homework1/pcss.png)
 
 ## learnOpengl
 ### Basic 基础功能
@@ -57,3 +69,7 @@ An render engine using opengl and imgui. Just for learning!
     ![img](res/output/gifs/ShadowMap.png)
   - PCF
     ![img](res/output/gifs/PCF.png)
+
+### PBR
+- 直接光照pbr
+  ![img](res/output/gifs/pbr0.png)

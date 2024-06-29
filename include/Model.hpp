@@ -26,13 +26,15 @@ class Model {
     vec3 rotate = vec3(0.0f);
 
     mat4 model = mat4(1.0f);
+    bool spin = false;
 
     shared_ptr<Shader> shader;
 
     Material mat = Material();
+    PBR pbr = PBR();
     vec4 ObjectColor = vec4(1.0f);
     Model(const std::string &filename, shared_ptr<Shader> &shader, int i = 0);
-    virtual mat4 ModelMat();
+    virtual mat4 ModelMat(float curTime = 0.0f);
     void Draw();
 
   private:
@@ -48,7 +50,7 @@ class PointLightModel : public Model {
     PointLightModel(shared_ptr<Shader> &shader, const PointLight &light = PointLight());
     PointLight light;
     bool goRoundY = false;
-    virtual mat4 ModelMat() override;
+    virtual mat4 ModelMat(float curTime = 0.0f) override;
     void updatePosition(double curTime);
 };
 #endif

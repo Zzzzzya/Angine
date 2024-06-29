@@ -8,9 +8,11 @@ Model::Model(const std::string &filename, shared_ptr<Shader> &shader, int i) : s
         loadModel(i, filename);
 }
 
-mat4 Model::ModelMat() {
+mat4 Model::ModelMat(float curTime) {
     model = glm::mat4(1.0f);
-
+    if (spin == true) {
+        rotate.y = radians((float)curTime) * 10000;
+    }
     model = glm::translate(model, translate);
     model = glm::scale(model, scale);
     model = glm::rotate(model, radians(rotate.x), vec3(1.0f, 0.0f, 0.0f));
@@ -51,6 +53,7 @@ void Model::loadModel(const std::string &filename) {
     auto lastl = path.find_last_of('/');
     directory = path.substr(0, lastl) + '/';
     name = path.substr(lastl, path.length());
+    name += std::to_string(rand() % 10);
     processNode(scene->mRootNode, scene);
 }
 
@@ -165,7 +168,7 @@ PointLightModel::PointLightModel(shared_ptr<Shader> &shader, const PointLight &t
     this->translate = this->light.position;
 }
 
-mat4 PointLightModel::ModelMat() {
+mat4 PointLightModel::ModelMat(float curTime) {
     mat4 model(1.0f);
 
     model = glm::translate(model, light.position);

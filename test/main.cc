@@ -6,6 +6,7 @@
 #include <GLFW/glfw3.h>
 #include <Windows.h>
 #include "Buffer.hpp"
+#include <random>
 
 using Camera::Movement::BACKWARD;
 using Camera::Movement::FORWARD;
@@ -103,6 +104,7 @@ shared_ptr<Shader> EmptyPhoneShader;
 shared_ptr<Shader> PhoneShader;
 shared_ptr<Shader> BlinnPhongShader;
 shared_ptr<Shader> Phong_ShadowMapShader;
+shared_ptr<Shader> PbrShader;
 /* Screen */
 shared_ptr<Shader> ScreenNothing;
 shared_ptr<Shader> ScreenBlur;
@@ -248,6 +250,7 @@ int main(int argc, char **argv) {
     BlinnPhongShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/BlinnPhong.fs");
     PhoneShader = std::make_shared<Shader>("MVP_3.vs", "Reality/Traditional/Phone.fs");
     Phong_ShadowMapShader = std::make_shared<Shader>("MVP_4_shadowMap.vs", "HighLevel/Shadow/shadowMap.fs");
+    PbrShader = std::make_shared<Shader>("MVP_4_shadowMap.vs", "Reality/PBR/PBR0.fs");
 
     ScreenNothing = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Nothing_vec2.fs");
     ScreenBlur = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Blur.fs");
@@ -268,26 +271,57 @@ int main(int argc, char **argv) {
     //     std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", Phong_ShadowMapShader));
     // scene->models[0]->scale = vec3(0.2);
     // scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", RefractShader));
-    scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", Phong_ShadowMapShader));
-    scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
+    // scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", Phong_ShadowMapShader));
+    // scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", Phong_ShadowMapShader));
+    // scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
     // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", ReflectShader));
+
+    int nrRows = 7;
+    int nrColumns = 7;
+    float spacing = 2.5;
+    for (int row = 0; row < nrRows; ++row) {
+        for (int col = 0; col < nrColumns; ++col) {
+
+            scene->models.push_back(std::make_shared<Model>("sphere.obj", PbrShader));
+            auto &cur = scene->models[scene->models.size() - 1];
+            cur->pbr.albedo = vec3(0.5f, 0.0f, 0.0f);
+            cur->pbr.metallic = (float)row / (float)nrRows;
+            cur->pbr.ao = 1.0f;
+            cur->pbr.roughness = glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f);
+            cur->translate = glm::vec3((col - (nrColumns / 2)) * spacing, (row - (nrRows / 2)) * spacing, 0.0f);
+        }
+    }
+
+    // auto &marry0 = scene->models[0];
+    // auto &marry1 = scene->models[1];
+
+    // marry0->scale = vec3(1.5f);
+    // marry1->translate = vec3(5.0f, 0.0f, -3.0f);
 
     scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
     scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
-
-    scene->pointLights[scene->pointLights.size() - 1]->scale = vec3(0.1f);
+    scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
+    scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
+    scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
+    scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
+    scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
+    scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
     //  // 相机创建！
 
     scene->camera = std::make_shared<Camera>(vec3(0.0f, 5.0f, 10.0f));
 
     PointLight theLight;
-    theLight.position = vec3(0.0f, 5.0f, 3.0f);
-    theLight.ambient = vec3(0.0f, 0.0f, 0.0f);
-    theLight.diffuse = vec3(0.5f, 0.5f, 0.5f);
-    theLight.specular = vec3(1.0f, 1.0f, 1.0f);
+    theLight.color = vec3(300.0f, 300.0f, 300.0f);
     theLight.ones = 0.00;
     theLight.secs = 0.00;
+    theLight.position = vec3(-10.0f, 10.0f, 10.0f);
     scene->pointLights[0]->light = theLight;
+    theLight.position = vec3(10.0f, 10.0f, 10.0f);
+    scene->pointLights[1]->light = theLight;
+    theLight.position = vec3(-10.0f, -10.0f, 10.0f);
+    scene->pointLights[2]->light = theLight;
+    theLight.position = vec3(10.0f, -10.0f, 10.0f);
+    scene->pointLights[3]->light = theLight;
 
     /* 🫣 天空盒 */
     skybox = std::make_shared<CubeMap>(faces);
@@ -295,6 +329,10 @@ int main(int argc, char **argv) {
 
     int frameCount = 0;
 
+    // poissonDiskSamples = generatePoissonDiskSamples(150);
+    // Phong_ShadowMapShader->use();
+    // auto loc = glGetUniformLocation(Phong_ShadowMapShader->pro, "poissonDisk");
+    // glUniform2fv(loc, poissonDiskSamples.size(), glm::value_ptr(poissonDiskSamples[0]));
     // Main loop
     while (!glfwWindowShouldClose(window)) {
         curTime = glfwGetTime();
@@ -344,7 +382,7 @@ int main(int argc, char **argv) {
         simpleDepthShader->setMat4("lightView", lightView);
 
         for (auto &model : scene->models) {
-            simpleDepthShader->setMat4("model", model->ModelMat());
+            simpleDepthShader->setMat4("model", model->ModelMat(curTime));
             for (auto &mesh : model->meshes) {
                 glBindVertexArray(mesh.VAO);
                 glDrawElements(GL_TRIANGLES, (unsigned int)mesh.indices.size(), GL_UNSIGNED_INT, 0);
@@ -456,7 +494,7 @@ void MainRender(const mat4 &view, const mat4 &projection) {
         }
         glStencilFunc(GL_ALWAYS, 1, 0xFF);
         model->shader->use();
-        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->shader->setMVPS(model->ModelMat(curTime), view, projection);
         model->shader->setCam(scene->camera);
         // 多光源设置
         model->shader->setInt("lightNum", scene->pointLights.size());
@@ -470,6 +508,7 @@ void MainRender(const mat4 &view, const mat4 &projection) {
         }
         model->shader->setInt("shadowMap", 30);
         model->shader->setMaterial(model->mat);
+        model->shader->setPbr(model->pbr);
         model->shader->setVec4("ObjectColor", model->ObjectColor);
         model->Draw();
     }
@@ -479,7 +518,7 @@ void MainRender(const mat4 &view, const mat4 &projection) {
         glStencilMask(0xff);
         glStencilFunc(GL_ALWAYS, 1, 0xff);
         model->shader->use();
-        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->shader->setMVPS(model->ModelMat(curTime), view, projection);
         model->shader->setCam(scene->camera);
         // 多光源设置
         model->shader->setInt("lightNum", scene->pointLights.size());
@@ -493,6 +532,7 @@ void MainRender(const mat4 &view, const mat4 &projection) {
         }
         model->shader->setInt("shadowMap", 30);
         model->shader->setMaterial(model->mat);
+        model->shader->setPbr(model->pbr);
         model->shader->setVec4("ObjectColor", model->ObjectColor);
         model->Draw();
 
@@ -504,7 +544,7 @@ void MainRender(const mat4 &view, const mat4 &projection) {
         glDisable(GL_DEPTH_TEST);
 
         model->shader->use();
-        model->shader->setMVPS(model->ModelMat(), view, projection);
+        model->shader->setMVPS(model->ModelMat(curTime), view, projection);
         model->Draw();
         model->shader = preShader;
 
@@ -560,6 +600,11 @@ void AppMainFunction() {
         CursorIsIn = true;
     }
 
+    static float a;
+    ImGui::SliderFloat("a", &a, 0.0f, 10.0f);
+    Phong_ShadowMapShader->use();
+    Phong_ShadowMapShader->setFloat("a", a);
+
     static char filepath[256] = ""; // 存储文件路径的缓冲区
     if (ImGui::Button("Import")) {
         OPENFILENAMEA ofn;
@@ -583,7 +628,14 @@ void AppMainFunction() {
             strncpy_s(filepath, sizeof(filepath), szFile, _TRUNCATE);
             string file = string(filepath);
             replaceBackslashWithForwardslash(file);
-            scene->models.emplace_back(std::make_shared<Model>(file, PhoneShader, 1));
+            for (auto &model : scene->models) {
+                if (model->name == file) {
+                    auto n = model->name[model->name.size() - 1];
+                    file += n + 1;
+                    break;
+                }
+            }
+            scene->models.emplace_back(std::make_shared<Model>(file, Phong_ShadowMapShader, 1));
             current_model_index = 0;
         }
     }
@@ -639,6 +691,11 @@ void AppModelEdit() {
     auto curModel = scene->models[current_model_index];
     ImGui::Text("Selected Model : %s", curModel->name.c_str());
 
+    if (ImGui::Button("转")) {
+        auto curTime = glfwGetTime();
+        curModel->spin = !curModel->spin;
+    }
+
     if (ImGui::CollapsingHeader("Position")) {
         ImGui::SliderFloat("translate.x", &curModel->translate.x, -10.0f, 10.0f);
         ImGui::SliderFloat("translate.y", &curModel->translate.y, -10.0f, 10.0f);
@@ -683,6 +740,16 @@ void AppModelEdit() {
         ImGui::SliderFloat("ObjectColor.g", &curModel->ObjectColor.g, 0.0f, 1.0f);
         ImGui::SliderFloat("ObjectColor.b", &curModel->ObjectColor.b, 0.0f, 1.0f);
         ImGui::SliderFloat("ObjectColor.a", &curModel->ObjectColor.a, 0.0f, 1.0f);
+    }
+
+    if (ImGui::CollapsingHeader("pbr")) {
+        ImGui::SliderFloat("albedo.x", &curModel->pbr.albedo.x, 0.0f, 1.0f);
+        ImGui::SliderFloat("albedo.y", &curModel->pbr.albedo.y, 0.0f, 1.0f);
+        ImGui::SliderFloat("albedo.z", &curModel->pbr.albedo.z, 0.0f, 1.0f);
+
+        ImGui::SliderFloat("metallic", &curModel->pbr.metallic, 0.0f, 1.0f);
+        ImGui::SliderFloat("roughness", &curModel->pbr.roughness, 0.0f, 1.0f);
+        ImGui::SliderFloat("ao", &curModel->pbr.ao, 0.0f, 1.0f);
     }
 
     if (ImGui::CollapsingHeader("Texture")) {
@@ -798,6 +865,9 @@ void AppLightEdit() {
         ImGui::SliderFloat("ambient", &curLight->light.ambient.r, -1.0f, 1.0f);
         ImGui::SliderFloat("ambient", &curLight->light.ambient.g, -1.0f, 1.0f);
         ImGui::SliderFloat("ambient", &curLight->light.ambient.b, -1.0f, 1.0f);
+        ImGui::SliderFloat("color.x", &curLight->light.color.x, 0.0f, 300.0f);
+        ImGui::SliderFloat("color.y", &curLight->light.color.y, 0.0f, 300.0f);
+        ImGui::SliderFloat("color.z", &curLight->light.color.z, 0.0f, 300.0f);
         ImGui::SliderFloat("oncs", &curLight->light.ones, 0.0f, 0.5f);
         ImGui::SliderFloat("secs", &curLight->light.secs, 0.0f, 0.05f);
     }

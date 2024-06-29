@@ -51,6 +51,46 @@ uniform bool ExistSpecularTexture;
 uniform bool ExistNormalTexture;
 uniform bool ExistHeightTexture;
 
+// 泊松
+vec2 poissonDisk[150];
+
+#define NUM_RINGS 10
+#define NUM_SAMPLES 150
+#define NUM_BLOCK_FILTER 150
+
+#define EPS 1e-3
+#define PI 3.141592653589793
+#define PI2 6.283185307179586
+
+highp float rand_1to1(highp float x) {
+    // -1 -1
+    return fract(sin(x) * 10000.0);
+}
+
+highp float rand_2to1(vec2 uv) {
+    // 0 - 1
+    const highp float a = 12.9898, b = 78.233, c = 43758.5453;
+    highp float dt = dot(uv.xy, vec2(a, b)), sn = mod(dt, PI);
+    return fract(sin(sn) * c);
+}
+
+void poissonDiskSamples(const in vec2 randomSeed) {
+
+    float ANGLE_STEP = PI2 * float(NUM_RINGS) / float(NUM_SAMPLES);
+    float INV_NUM_SAMPLES = 1.0 / float(NUM_SAMPLES);
+
+    float angle = rand_2to1(randomSeed) * PI2;
+    float radius = INV_NUM_SAMPLES;
+    float radiusStep = radius;
+
+    for (int i = 0; i < NUM_SAMPLES; i++) {
+        poissonDisk[i] = vec2(cos(angle), sin(angle)) * pow(radius, 0.75);
+        radius += radiusStep;
+        angle += ANGLE_STEP;
+    }
+}
+
+// PCF
 float ShadowCalculation(vec4 fragPosLightSpace, vec3 lightDir) {
     // 执行透视除法
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
@@ -62,14 +102,85 @@ float ShadowCalculation(vec4 fragPosLightSpace, vec3 lightDir) {
     float bias = 0.0002f;
     float currentDepth = projCoords.z;
     vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
-    // for (int x = -3; x <= 3; ++x) {
-    //     for (int y = -3; y <= 3; ++y) {
+    // for (int x = -6; x <= 6; ++x) {
+    //     for (int y = -6; y <= 6; ++y) {
     //         float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
     //         shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
     //     }
     // }
-    // shadow /= 49.0;
-    shadow = currentDepth - bias > texture(shadowMap, projCoords.xy).r ? 1.0 : 0.0;
+    // shadow /= 13 * 13;
+
+    // 泊松圆环采样
+    float diskRadius = 7.0 / (1024);
+    poissonDiskSamples(projCoords.xy);
+    for (int i = 0; i < 20; ++i) {
+        vec2 offset = poissonDisk[i] * diskRadius;
+        float sampleDepth = texture(shadowMap, projCoords.xy + offset).r;
+        if (currentDepth < sampleDepth + 0.0002) {
+            shadow += 1.0;
+        }
+    }
+
+    shadow /= 20.0;
+    return shadow;
+}
+
+const float Wlight = 10.0f;
+uniform float a;
+
+float unpack(vec4 rgbaDepth) {
+    const vec4 bitShift = vec4(1.0, 1.0 / 256.0, 1.0 / (256.0 * 256.0), 1.0 / (256.0 * 256.0 * 256.0));
+    return dot(rgbaDepth, bitShift);
+}
+
+float PCSS(vec4 fragPosLightSpace) {
+
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+    projCoords = projCoords * 0.5 + 0.5;
+    if (projCoords.z > 1.0f)
+        return 0.0f;
+
+    float shadow = 0.0f;
+    float currentDepth = projCoords.z;
+    float d_blocker = 0.0f;
+    int num_d_blocker = 0;
+    float bias = 0.0002f;
+    // 生成泊松数组
+    poissonDiskSamples(projCoords.xy);
+    //  1.  对shadowMap做范围深度测试 来查找blocker遮挡物的平均深度
+    float del = 10.0 / (1024);
+    for (int i = 0; i < NUM_BLOCK_FILTER; i++) {
+        vec2 sampleuv = projCoords.xy + poissonDisk[i] * del;
+        float sampleDepth = (texture(shadowMap, sampleuv).r);
+        if (currentDepth - bias > sampleDepth) {
+            d_blocker += sampleDepth;
+            num_d_blocker += 1;
+        }
+    }
+
+    if (num_d_blocker < 1e-7) {
+        // 根本没遮挡
+        return 0.0f;
+    }
+
+    d_blocker = d_blocker / float(num_d_blocker);
+    d_blocker = min(d_blocker, projCoords.z);
+
+    // 计算滤波大小
+    float Wpen = Wlight * (projCoords.z / d_blocker - 1);
+
+    // 泊松圆环采样
+    float diskRadius = Wpen / a;
+    // poissonDiskSamples(projCoords.xy);
+    for (int i = 0; i < 150; ++i) {
+        vec2 offset = poissonDisk[i] * diskRadius;
+        float sampleDepth = texture(shadowMap, projCoords.xy + offset).r;
+        if (currentDepth - bias > sampleDepth) {
+            shadow += 1.0;
+        }
+    }
+
+    shadow /= 150.0;
     return shadow;
 }
 
@@ -120,8 +231,8 @@ void main() {
         vec3 specular = spec * light[i].specular * specColor;
 
         float shadow = ShadowCalculation(FragPosLightSpace, NormalLightDir);
-
-        result = result + reduce * (ambient + (1.0 - shadow) * (diffuse + specular));
+        // float shadow = PCSS(FragPosLightSpace);
+        result = result + reduce * shadow * (ambient + (diffuse + specular));
     }
 
     FragColor = vec4(result, 1.0f) * ObjectColor;

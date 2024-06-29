@@ -76,6 +76,7 @@ void Shader::setPointLight(int i, const PointLight &light) {
     this->setVec3(light_pre + "ambient", light.ambient);
     this->setVec3(light_pre + "diffuse", light.diffuse);
     this->setVec3(light_pre + "specular", light.specular);
+    this->setVec3(light_pre + "color", light.color);
 
     this->setFloat(light_pre + "constant", 1.0f);
     this->setFloat(light_pre + "ones", light.ones);
@@ -88,6 +89,13 @@ void Shader::setMaterial(const Material &mat) {
     this->setVec3("material.diffuse", mat.diffuse);
     this->setVec3("material.specular", mat.specular);
     this->setVec3("material.ambient", mat.ambient);
+}
+
+void Shader::setPbr(const PBR &pbr) {
+    this->setVec3("albedo", pbr.albedo);
+    this->setFloat("metallic", pbr.metallic);
+    this->setFloat("roughness", pbr.roughness);
+    this->setFloat("ao", pbr.ao);
 }
 
 void Shader::SetUpShader(const std::string &vertexName, const std::string &fragmentName,
