@@ -78,3 +78,4 @@ An render engine using opengl and imgui. Just for learning!
   - diffuse
     ![img](res/output/gifs/IBL_diffuse.png)
   - specular
+    ![img](res/output/gifs/HDR_IBL.png)
