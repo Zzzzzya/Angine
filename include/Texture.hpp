@@ -31,4 +31,15 @@ class CubeMap {
   private:
     void loadCubeMap(const std::vector<std::string> &paths, const std::string &directory);
 };
+
+class Texture_HDR {
+  public:
+    unsigned int id = -1;
+
+    Texture_HDR(const std::string &paths, const std::string &directory = std::string("../res/textures/"));
+    static unsigned int hdr();
+
+  private:
+    void loadHDR(const std::string &paths, const std::string &directory);
+};
 #endif

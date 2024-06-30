@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Header.hpp"
+#include "Texture.hpp"
 
 class FrameBuffer {
   public:
@@ -21,4 +22,17 @@ class FrameBufferDepthMap {
 
   private:
     void setUpFrameBuffer(int imageWidth, int imageHeight);
+};
+
+class Shader;
+class FrameBufferEnvCube {
+  public:
+    FrameBufferEnvCube();
+    void shade(shared_ptr<Shader> &shader, unsigned int texId);
+    unsigned int FBO;
+    unsigned int RBO;
+    unsigned int env;
+
+  private:
+    void setUp();
 };
