@@ -112,6 +112,7 @@ shared_ptr<Shader> ScreenGrayScale;
 shared_ptr<Shader> ScreenSharpen;
 
 shared_ptr<Shader> HDR2cubeShader;
+shared_ptr<Shader> irradianceShader;
 
 vector<shared_ptr<Shader>> MyShaders;
 /* actual screenShader we r using */
@@ -260,6 +261,7 @@ int main(int argc, char **argv) {
     ScreenSharpen = std::make_shared<Shader>("Nothing_vec2.vs", "Screen/Sharpen.fs");
 
     HDR2cubeShader = std::make_shared<Shader>("HDR2cube.vs", "Other/HDR2cube.fs");
+    irradianceShader = std::make_shared<Shader>("HDR2cube.vs", "pbr/Convolution.fs");
 
     ScreenShader = ScreenNothing;
     MyShaders.push_back(BlinnPhongShader);
@@ -280,13 +282,13 @@ int main(int argc, char **argv) {
     // scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
     // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", ReflectShader));
 
-    Texture albedo("rust/albedo.png");
-    Texture metallic("rust/metallic.png");
-    Texture roughness("rust/roughness.png");
+    // Texture albedo("rust/albedo.png");
+    // Texture metallic("rust/metallic.png");
+    // Texture roughness("rust/roughness.png");
 
-    albedo.type = "texture_albedo";
-    metallic.type = "texture_metallic";
-    roughness.type = "texture_roughness";
+    // albedo.type = "texture_albedo";
+    // metallic.type = "texture_metallic";
+    // roughness.type = "texture_roughness";
 
     int nrRows = 7;
     int nrColumns = 7;
@@ -302,9 +304,9 @@ int main(int argc, char **argv) {
             cur->pbr.roughness = glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f);
             cur->translate = glm::vec3((col - (nrColumns / 2)) * spacing, (row - (nrRows / 2)) * spacing, 0.0f);
 
-            cur->meshes[0].textures.push_back(albedo);
-            cur->meshes[0].textures.push_back(metallic);
-            cur->meshes[0].textures.push_back(roughness);
+            // cur->meshes[0].textures.push_back(albedo);
+            // cur->meshes[0].textures.push_back(metallic);
+            // cur->meshes[0].textures.push_back(roughness);
         }
     }
 
@@ -336,7 +338,7 @@ int main(int argc, char **argv) {
     glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 512, 512);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
 
-    Texture_HDR hdr("HDR1.hdr");
+    Texture_HDR hdr("hdr3.hdr");
     // // pbr: load the HDR environment map
     // // ---------------------------------
     // auto hdrTexture = Texture_HDR::hdr();
@@ -384,6 +386,48 @@ int main(int argc, char **argv) {
         renderCube();
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    // 以上做了两件事情 读取TEXTURE hdr --> 2D  -->渲染到一个cubemap上  叫env
+    // 接下来做卷积！
+    unsigned int irradianceMap;
+    glGenTextures(1, &irradianceMap);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+    for (int i = 0; i < 6; i++) {
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 32, 32, 0, GL_RGB, GL_FLOAT, nullptr);
+    }
+
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 32, 32);
+
+    irradianceShader->use();
+    irradianceShader->setInt("environmentMap", 0);
+    irradianceShader->setMat4("projection", captureProjection);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+    glViewport(0, 0, 32, 32); // don't forget to configure the viewport to the capture dimensions.
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    for (unsigned int i = 0; i < 6; ++i) {
+        irradianceShader->setMat4("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, irradianceMap,
+                               0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        renderCube();
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glActiveTexture(GL_TEXTURE18);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, irradianceMap);
+    PbrShader->use();
+    PbrShader->setInt("irradianceMap", 18);
+    glActiveTexture(GL_TEXTURE0);
 
     glEnable(GL_STENCIL_TEST);
     glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);

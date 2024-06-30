@@ -3,3 +3,4 @@ CMakeUserPresets.json
 .clang-format
 build/
 .vscode/
+res/textures/hdr3.hdr

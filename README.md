@@ -74,3 +74,7 @@ An render engine using opengl and imgui. Just for learning!
 - 直接光照pbr
   ![img](res/output/gifs/pbr0.png)
   ![img](res/output/gifs/pbr_image.png)
+- IBL
+  - diffuse
+    ![img](res/output/gifs/IBL_diffuse.png)
+  - specular

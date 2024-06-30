@@ -59,6 +59,8 @@ uniform bool ExistSpecularTexture;
 uniform bool ExistNormalTexture;
 uniform bool ExistHeightTexture;
 
+uniform samplerCube irradianceMap;
+
 // BRDF
 // D F G / (4 * (Wi dot n)* (Wo dot n))
 // F 菲尼尔项
@@ -117,6 +119,8 @@ void main() {
     vec3 V = normalize(camera.position - FragPos);
 
     vec3 Lo = vec3(0.0f);
+    vec3 F0 = vec3(0.04);
+    F0 = mix(F0, the_albedo, the_metallic);
     for (int i = 0; i < lightNum; i++) {
         // 对所有光源做累加计算
         // 1.可预计算部分
@@ -130,8 +134,6 @@ void main() {
         float NDF = DistributionGGX(N, H, the_roughness);
         float G = GeometrySmith(N, V, Li, the_roughness);
 
-        vec3 F0 = vec3(0.04);
-        F0 = mix(F0, the_albedo, the_metallic);
         vec3 F = fresnelShlick(max(dot(H, V), 0.0f), F0);
 
         vec3 nominator = NDF * G * F;
@@ -147,7 +149,12 @@ void main() {
         float NdotL = max(dot(N, Li), 0.0f);
         Lo += (kD * diffuse + specular) * radiance * NdotL;
     }
-    vec3 ambient = vec3(0.02) * the_albedo * the_ao;
+    vec3 kS = fresnelShlick(max(dot(N, V), 0.0f), F0);
+    vec3 kD = 1.0f - kS;
+    kD *= 1.0f - the_metallic;
+    vec3 irradiance = texture(irradianceMap, normal).rgb;
+    vec3 diffuse = irradiance * the_albedo;
+    vec3 ambient = kD * diffuse * the_ao;
     vec3 color = ambient + Lo;
     // color = color / (color + vec3(1.0f));
     // color = pow(color, vec3(1.0f / 2.2f));
