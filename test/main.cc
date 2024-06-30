@@ -36,7 +36,7 @@ int shadowHeight = 1024;
 /* 场景 */
 shared_ptr<Scene> scene = std::make_shared<Scene>();
 
-bool skyboxOn = false;
+bool skyboxOn = true;
 shared_ptr<CubeMap> skybox;
 shared_ptr<ArrayMesh> skyboxArrayMesh;
 
@@ -224,9 +224,6 @@ int main(int argc, char **argv) {
 
     // Mine
     glEnable(GL_DEPTH_TEST);
-    glEnable(GL_STENCIL_TEST);
-    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
-    glEnable(GL_CULL_FACE);
 
     // 帧缓冲
     FrameBuffer framebuffer(imageWidth, imageHeight);
@@ -360,33 +357,37 @@ int main(int argc, char **argv) {
 
     // // pbr: set up projection and view matrices for capturing data onto the 6 cubemap face directions
     // // ----------------------------------------------------------------------------------------------
-    // glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
-    // glm::mat4 captureViews[] = {
-    //     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-    //     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-    //     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-    //     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
-    //     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-    //     glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f))};
+    glm::mat4 captureProjection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
+    glm::mat4 captureViews[] = {
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+        glm::lookAt(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f))};
 
-    // // pbr: convert HDR equirectangular environment map to cubemap equivalent
-    // // ----------------------------------------------------------------------
-    // HDR2cubeShader->use();
-    // HDR2cubeShader->setInt("equirectangularMap", 0);
-    // HDR2cubeShader->setMat4("projection", captureProjection);
-    // glActiveTexture(GL_TEXTURE0);
-    // glBindTexture(GL_TEXTURE_2D, hdrTexture);
+    // pbr: convert HDR equirectangular environment map to cubemap equivalent
+    // ----------------------------------------------------------------------
+    HDR2cubeShader->use();
+    HDR2cubeShader->setInt("equirectangularMap", 0);
+    HDR2cubeShader->setMat4("projection", captureProjection);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, hdr.id);
 
-    // glViewport(0, 0, 512, 512); // don't forget to configure the viewport to the capture dimensions.
-    // glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
-    // for (unsigned int i = 0; i < 6; ++i) {
-    //     HDR2cubeShader->setMat4("view", captureViews[i]);
-    //     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap,
-    //     0); glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glViewport(0, 0, 512, 512); // don't forget to configure the viewport to the capture dimensions.
+    glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+    for (unsigned int i = 0; i < 6; ++i) {
+        HDR2cubeShader->setMat4("view", captureViews[i]);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap, 0);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    //     renderCube();
-    // }
-    // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        renderCube();
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    glEnable(GL_STENCIL_TEST);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    glEnable(GL_CULL_FACE);
 
     int frameCount = 0;
 
@@ -451,12 +452,12 @@ int main(int argc, char **argv) {
 
         view = scene->camera->ViewMat();
         projection = glm::perspective(radians(scene->camera->fov), (float)display_w / display_h, 0.1f, 100.0f);
-        // ------------  State 1 ------------- 渲染至帧缓冲 👌👌👌👌
+        // ------------  State 1 -------------
         glEnable(GL_FRAMEBUFFER_SRGB);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0); /* 🫣 绑定帧缓冲*/
         glViewport(0, 0, display_w, display_h);
-        glClearColor(0.0f, 0.0f, 0.0f, 1.00f);
+        glClearColor(0.5f, 0.0f, 0.0f, 1.00f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
         // 绘制天空盒
@@ -468,11 +469,9 @@ int main(int argc, char **argv) {
             SkyboxShader->setMat4("view", mat4(glm::mat3(view)));
             SkyboxShader->setMat4("projection", projection);
             SkyboxShader->setInt("skybox", 0);
-            // glBindVertexArray(skyboxArrayMesh->VAO);
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, hdr.id);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
             renderCube();
-            // glDrawArrays(GL_TRIANGLES, 0, 36);
             glDepthMask(GL_TRUE);
             glBindVertexArray(0);
         }
@@ -490,7 +489,7 @@ int main(int argc, char **argv) {
         MainRender(view, projection);
 
         // --------------- State 1 End -----------------
-        glBindFramebuffer(GL_FRAMEBUFFER, 0); //  解绑 返回默认帧缓冲
+        // glBindFramebuffer(GL_FRAMEBUFFER, 0); //  解绑 返回默认帧缓冲
 
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
