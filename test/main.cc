@@ -284,10 +284,10 @@ int main(int argc, char **argv) {
     //     std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", Phong_ShadowMapShader));
     // scene->models[0]->scale = vec3(0.2);
     // scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", RefractShader));
-    // scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", Phong_ShadowMapShader));
+    scene->models.push_back(std::make_shared<Model>("Sponza/Sponza.fbx", PbrShader));
     // scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", PhoneShader));
     // scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
-    // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", ReflectShader));
+    // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PbrShader));
 
     // Texture albedo("rust/albedo.png");
     // Texture metallic("rust/metallic.png");
@@ -297,25 +297,25 @@ int main(int argc, char **argv) {
     // metallic.type = "texture_metallic";
     // roughness.type = "texture_roughness";
 
-    int nrRows = 7;
-    int nrColumns = 7;
-    float spacing = 2.5;
-    for (int row = 0; row < nrRows; ++row) {
-        for (int col = 0; col < nrColumns; ++col) {
+    // int nrRows = 7;
+    // int nrColumns = 7;
+    // float spacing = 2.5;
+    // for (int row = 0; row < nrRows; ++row) {
+    //     for (int col = 0; col < nrColumns; ++col) {
 
-            scene->models.push_back(std::make_shared<Model>("sphere.obj", PbrShader));
-            auto &cur = scene->models[scene->models.size() - 1];
-            cur->pbr.albedo = vec3(0.5f, 0.0f, 0.0f);
-            cur->pbr.metallic = (float)row / (float)nrRows;
-            cur->pbr.ao = 1.0f;
-            cur->pbr.roughness = glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f);
-            cur->translate = glm::vec3((col - (nrColumns / 2)) * spacing, (row - (nrRows / 2)) * spacing, 0.0f);
+    //         scene->models.push_back(std::make_shared<Model>("sphere.obj", PbrShader));
+    //         auto &cur = scene->models[scene->models.size() - 1];
+    //         cur->pbr.albedo = vec3(0.5f, 0.0f, 0.0f);
+    //         cur->pbr.metallic = (float)row / (float)nrRows;
+    //         cur->pbr.ao = 1.0f;
+    //         cur->pbr.roughness = glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f);
+    //         cur->translate = glm::vec3((col - (nrColumns / 2)) * spacing, (row - (nrRows / 2)) * spacing, 0.0f);
 
-            // cur->meshes[0].textures.push_back(albedo);
-            // cur->meshes[0].textures.push_back(metallic);
-            // cur->meshes[0].textures.push_back(roughness);
-        }
-    }
+    //         // cur->meshes[0].textures.push_back(albedo);
+    //         // cur->meshes[0].textures.push_back(metallic);
+    //         // cur->meshes[0].textures.push_back(roughness);
+    //     }
+    // }
 
     scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
     scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);

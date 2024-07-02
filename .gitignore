@@ -4,3 +4,4 @@ CMakeUserPresets.json
 build/
 .vscode/
 res/textures/hdr3.hdr
+res/models/Sponza

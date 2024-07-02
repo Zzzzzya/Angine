@@ -5,6 +5,7 @@
   - [Games202](#games202)
     - [homework0](#homework0)
     - [homework1](#homework1)
+    - [homework2](#homework2)
   - [learnOpengl](#learnopengl)
     - [Basic 基础功能](#basic-基础功能)
     - [高级Opengl篇](#高级opengl篇)
@@ -31,6 +32,12 @@ An render engine using opengl and imgui. Just for learning!
   ![img](res/output/gifs/games202/homework1/poisson.png)
 - 3. PCSS
   ![img](res/output/gifs/games202/homework1/pcss.png)
+
+### homework2
+预计算环境光照 + 旋转光源
+![img](res/output/gifs/games202/homework2/1.png)
+![img](res/output/gifs/yesyesyes.gif)
+![img](res/output/gifs/games202/homework2/image.png)
 
 ## learnOpengl
 ### Basic 基础功能
@@ -79,3 +86,5 @@ An render engine using opengl and imgui. Just for learning!
     ![img](res/output/gifs/IBL_diffuse.png)
   - specular
     ![img](res/output/gifs/HDR_IBL.png)
+
+    
