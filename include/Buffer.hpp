@@ -36,3 +36,16 @@ class FrameBufferEnvCube {
   private:
     void setUp();
 };
+
+class GBuffer {
+  public:
+    GBuffer();
+    // void shade(shared_ptr<Shader> &shader, unsigned int texId);
+    unsigned int gBuffer;
+    unsigned int gPosition;
+    unsigned int gNormal;
+    unsigned int gAlbedoSpec;
+
+  private:
+    void setUp();
+};

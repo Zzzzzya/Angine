@@ -214,3 +214,55 @@ void FrameBufferEnvCube::shade(shared_ptr<Shader> &shader, unsigned int texId) {
     }
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
+
+GBuffer::GBuffer() {
+    setUp();
+}
+
+void GBuffer::setUp() {
+    glGenFramebuffers(1, &this->gBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, this->gBuffer);
+
+    // 位置颜色缓冲
+    glGenTextures(1, &this->gPosition);
+    glBindTexture(GL_TEXTURE_2D, this->gPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 1600, 900, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // 法线
+    glGenTextures(1, &this->gNormal);
+    glBindTexture(GL_TEXTURE_2D, this->gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 1600, 900, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // 颜色
+    glGenTextures(1, &this->gAlbedoSpec);
+    glBindTexture(GL_TEXTURE_2D, this->gAlbedoSpec);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1600, 900, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedoSpec, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    unsigned int attachments[3] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2};
+    glDrawBuffers(3, attachments);
+
+    // 4.创建一个渲染缓冲
+    unsigned int rbo;
+    glGenRenderbuffers(1, &rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, 1600, 900);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    // 5.把渲染缓冲对象附加到帧缓冲的深度和模板附件上
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, rbo);
+    // 6.检查帧缓冲是否完整 否则打印错误信息。
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}

@@ -11,6 +11,7 @@
     - [高级Opengl篇](#高级opengl篇)
     - [高级光照](#高级光照)
     - [PBR](#pbr)
+    - [延迟渲染](#延迟渲染)
 
 # Angine
 An render engine using opengl and imgui. Just for learning!
@@ -87,4 +88,12 @@ An render engine using opengl and imgui. Just for learning!
   - specular
     ![img](res/output/gifs/HDR_IBL.png)
 
-    
+### 延迟渲染
+- GBuffer渲染
+  ![img](res/output/gifs/defer_gbuffer0.jpg)
+  ![img](res/output/gifs/defer_gbuffer1.jpg)
+  ![img](res/output/gifs/defer_gbuffer2.png)
+  ![img](res/output/gifs/defer_gbuffer3.png)
+  ![img](res/output/gifs/defer_gbuffer4.png)
+- 延迟渲染
+  ![img](res/output/gifs/defer_with.png)
