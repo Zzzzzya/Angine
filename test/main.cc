@@ -122,6 +122,8 @@ shared_ptr<Shader> ScreenSharpen;
 /* Render */
 shared_ptr<Shader> GBufferShader;
 shared_ptr<Shader> D_PhongShader;
+shared_ptr<Shader> ssaoShader;
+shared_ptr<Shader> ssaoBlurShader;
 
 shared_ptr<Shader> HDR2cubeShader;
 shared_ptr<Shader> irradianceShader;
@@ -132,7 +134,7 @@ vector<shared_ptr<Shader>> MyShaders;
 /* actual screenShader we r using */
 shared_ptr<Shader> ScreenShader;
 
-const static mat4 lightProjection = glm::perspective(radians(90.0f), 1.0f, 0.1f, 1000.0f);
+const static mat4 lightProjection = glm::perspective(radians(100.0f), 1.0f, 0.1f, 1000.0f);
 
 /* 天空盒路径 */
 vector<string> faces = {"skybox/right.jpg",  "skybox/left.jpg",  "skybox/top.jpg",
@@ -200,6 +202,13 @@ unsigned int cubeVAO = 0;
 unsigned int cubeVBO = 0;
 unsigned int quadVAO = 0;
 unsigned int quadVBO;
+
+/* ASSAO */
+std::uniform_real_distribution<GLfloat> randomFloats(0.0, 1.0); // 随机浮点数，范围0.0 - 1.0
+std::default_random_engine generator;
+std::vector<glm::vec3> ssaoKernel;
+std::vector<glm::vec3> ssaoNoise;
+bool ssaoOn = true;
 
 int main(int argc, char **argv) {
     // Setup window
@@ -282,10 +291,12 @@ int main(int argc, char **argv) {
     irradianceShader = std::make_shared<Shader>("HDR2cube.vs", "pbr/Convolution.fs");
     prefilterShader = std::make_shared<Shader>("HDR2cube.vs", "pbr/preFilter.fs");
 
-    GBufferShader = std::make_shared<Shader>("MVP_3.vs", "render/Gbuffer.fs");
+    GBufferShader = std::make_shared<Shader>("D_MVP_SHADOW.vs", "render/Gbuffer.fs");
 
     // Defer
     D_PhongShader = std::make_shared<Shader>("Nothing_vec2.vs", "Defer/Phong.fs");
+    ssaoShader = std::make_shared<Shader>("Nothing_vec2.vs", "Defer/SSAO.fs");
+    ssaoBlurShader = std::make_shared<Shader>("Nothing_vec2.vs", "Defer/ssaoBlur.fs");
 
     ScreenShader = ScreenNothing;
     MyShaders.push_back(BlinnPhongShader);
@@ -301,11 +312,11 @@ int main(int argc, char **argv) {
     //     std::make_shared<Model>("genshin_impact_obj/Ganyu model/Ganyu model.pmx", Phong_ShadowMapShader));
     // scene->models[0]->scale = vec3(0.2);
 
-    // scene->models.push_back(std::make_shared<Model>("Sponza/Sponza.fbx", Phong_ShadowMapShader));
+    // scene->models.push_back(std::make_shared<Model>("Sponza/Sponza.fbx", D_PhongShader));
     // scene->models[0]->scale = vec3(0.015f);
 
-    // scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", PhoneShader));
-    // scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
+    scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", PhoneShader));
+    scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
     // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PbrShader));
 
     // Texture albedo("rust/albedo.png");
@@ -316,35 +327,33 @@ int main(int argc, char **argv) {
     // metallic.type = "texture_metallic";
     // roughness.type = "texture_roughness";
 
-    int nrRows = 3;
-    int nrColumns = 3;
-    float spacing = 2.5;
-    for (int row = 0; row < nrRows; ++row) {
-        for (int col = 0; col < nrColumns; ++col) {
+    // int nrRows = 3;
+    // int nrColumns = 3;
+    // float spacing = 2.5;
+    // for (int row = 0; row < nrRows; ++row) {
+    //     for (int col = 0; col < nrColumns; ++col) {
 
-            scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", PhoneShader));
-            auto &curModel = scene->models[scene->models.size() - 1];
-            curModel->translate = vec3(-3 + row * 8, 0, 3 - col * 8);
-        }
-    }
+    //         scene->models.push_back(std::make_shared<Model>("nanosuit/nanosuit.obj", PhoneShader));
+    //         auto &curModel = scene->models[scene->models.size() - 1];
+    //         curModel->translate = vec3(-3 + row * 8, 0, 3 - col * 8);
+    //     }
+    // }
 
-    for (int i = 0; i < 8; i++) {
-        scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
-        scene->pointLights[scene->pointLights.size() - 1]->name =
-            "Light" + std::to_string(scene->pointLights.size() - 1);
-        scene->pointLights[scene->pointLights.size() - 1]->light.color = vec3(300.0f, 300.0f, 300.0f);
-        scene->pointLights[scene->pointLights.size() - 1]->light.position = vec3(-15.0f + i * 2, 15.0f, 0.0f);
-    }
+    /* SScene */
+    scene->pointLights.push_back(std::make_shared<PointLightModel>(LightShader));
+    scene->pointLights[scene->pointLights.size() - 1]->name = "Light" + std::to_string(scene->pointLights.size() - 1);
+    scene->pointLights[scene->pointLights.size() - 1]->light.color = vec3(300.0f, 300.0f, 300.0f);
+
     //  // 相机创建！
 
-    scene->camera = std::make_shared<Camera>(vec3(6.0f, 5.0f, 10.0f));
+    scene->camera = std::make_shared<Camera>(vec3(-11.243f, 1.925f, 4.037f));
 
     PointLight theLight;
     theLight.color = vec3(300.0f, 300.0f, 300.0f);
     theLight.ones = 0.00;
     theLight.secs = 0.00;
-    // theLight.position = vec3(-11.243f, 1.925f, 4.037f);
-    theLight.position = vec3(6.0f, 21.0f, 14.0f);
+    theLight.position = vec3(-16.f, 6.f, 0.f);
+    // theLight.position = vec3(6.0f, 21.0f, 14.0f);
     scene->pointLights[0]->light = theLight;
 
     /* 🫣 天空盒 */
@@ -533,6 +542,58 @@ int main(int argc, char **argv) {
     PbrShader->setInt("brdfLUT", 16);
     glActiveTexture(GL_TEXTURE0);
 
+    /* MSSAO */
+    auto lerp = [](GLfloat a, GLfloat b, GLfloat f) -> GLfloat { return a + f * (b - a); };
+    for (int i = 0; i < 64; i++) {
+        glm::vec3 sample(randomFloats(generator) * 2.0f - 1.0f, randomFloats(generator) * 2.0f - 1.0f,
+                         randomFloats(generator));
+        sample = glm::normalize(sample);
+        sample *= randomFloats(generator);
+        GLfloat scale = lerp(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+        ssaoKernel.push_back(sample);
+    }
+    for (int i = 0; i < 16; i++) {
+        glm::vec3 sample(randomFloats(generator) * 2.0f - 1.0f, randomFloats(generator) * 2.0f - 1.0f,
+                         randomFloats(generator));
+        ssaoNoise.push_back(sample);
+    }
+    unsigned int noiseTexture;
+    glGenTextures(1, &noiseTexture);
+    glBindTexture(GL_TEXTURE_2D, noiseTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, &ssaoNoise[0]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    unsigned int ssaoFBO;
+    glGenFramebuffers(1, &ssaoFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+
+    unsigned int ssaoColorBuffer;
+    glGenTextures(1, &ssaoColorBuffer);
+    glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 1600, 900, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBuffer, 0);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    GLuint ssaoBlurFBO, ssaoColorBufferBlur;
+    glGenFramebuffers(1, &ssaoBlurFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+    glGenTextures(1, &ssaoColorBufferBlur);
+    glBindTexture(GL_TEXTURE_2D, ssaoColorBufferBlur);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, 1600, 900, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBufferBlur, 0);
+
+    /* GB */
     GBuffer gBuffer;
     renderTexture = gBuffer.gPosition;
 
@@ -614,20 +675,20 @@ int main(int argc, char **argv) {
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
             // 绘制天空盒
-            if (skyboxOn) {
-                glDisable(GL_DEPTH_TEST);
-                glDisable(GL_STENCIL_TEST);
-                glDisable(GL_CULL_FACE);
-                SkyboxShader->use();
-                SkyboxShader->setMat4("view", mat4(glm::mat3(view)));
-                SkyboxShader->setMat4("projection", projection);
-                SkyboxShader->setInt("skybox", 0);
-                glActiveTexture(GL_TEXTURE0);
-                glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
-                renderCube();
-                glDepthMask(GL_TRUE);
-                glBindVertexArray(0);
-            }
+            // if (skyboxOn) {
+            //     glDisable(GL_DEPTH_TEST);
+            //     glDisable(GL_STENCIL_TEST);
+            //     glDisable(GL_CULL_FACE);
+            //     SkyboxShader->use();
+            //     SkyboxShader->setMat4("view", mat4(glm::mat3(view)));
+            //     SkyboxShader->setMat4("projection", projection);
+            //     SkyboxShader->setInt("skybox", 0);
+            //     glActiveTexture(GL_TEXTURE0);
+            //     glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+            //     renderCube();
+            //     glDepthMask(GL_TRUE);
+            //     glBindVertexArray(0);
+            // }
             // 渲染
 
             glEnable(GL_DEPTH_TEST);
@@ -640,6 +701,23 @@ int main(int argc, char **argv) {
             glActiveTexture(GL_TEXTURE0);
 
             MainRender(view, projection);
+
+            glDepthFunc(GL_LEQUAL); // change depth function so depth test passes when values are equal to depth
+                                    // buffer's content
+            if (skyboxOn) {
+                glDisable(GL_STENCIL_TEST);
+                glDisable(GL_CULL_FACE);
+                SkyboxShader->use();
+                SkyboxShader->setMat4("view", mat4(glm::mat3(view)));
+                SkyboxShader->setMat4("projection", projection);
+                SkyboxShader->setInt("skybox", 0);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+                renderCube();
+                // glDepthMask(GL_TRUE);
+                glBindVertexArray(0);
+            }
+            glDepthFunc(GL_LESS);
         }
         else if (renderMode == DEFERRED_RENDER) {
             // ---- shadow map ----
@@ -682,15 +760,25 @@ int main(int argc, char **argv) {
             glDisable(GL_STENCIL_TEST);
             glDisable(GL_CULL_FACE);
 
-            // glActiveTexture(GL_TEXTURE30);
-            // glBindTexture(GL_TEXTURE_2D, shadowMap.depthMapTexture);
-            // glActiveTexture(GL_TEXTURE0);
+            glActiveTexture(GL_TEXTURE30);
+            glBindTexture(GL_TEXTURE_2D, shadowMap.depthMapTexture);
+            glActiveTexture(GL_TEXTURE0);
 
             GBufferShader->use();
             GBufferShader->setCam(scene->camera);
+            GBufferShader->setInt("shadowMap", 30);
+
+            for (int i = 0; i < scene->pointLights.size(); i++) {
+                vec3 lightFront = vec3(0.0f) - scene->pointLights[i]->light.position;
+                auto right = normalize(glm::cross(lightFront, vec3(0.0f, 1.0f, 0.0f)));
+                vec3 lightUp = normalize(glm::cross(right, lightFront));
+                auto lightView = glm::lookAt(scene->pointLights[i]->light.position, vec3(0.0f), lightUp);
+                GBufferShader->setMat4("lightSpaceMatrix", lightProjection * lightView);
+            }
 
             for (auto &model : scene->models) {
                 GBufferShader->setMVPS(model->ModelMat(curTime), view, projection);
+                GBufferShader->setMaterial(model->mat);
                 for (auto &mesh : model->meshes) {
                     mesh.Draw(GBufferShader);
                 }
@@ -701,12 +789,62 @@ int main(int argc, char **argv) {
             }
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            // -------- SSAO ---------
+            glBindFramebuffer(GL_FRAMEBUFFER, ssaoFBO);
+            glClearColor(0.0f, 0.0f, 1.0f, 1.00f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glDisable(GL_DEPTH_TEST);
+
+            ssaoShader->use();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gPosition);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gNormal);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gAlbedoSpec);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gShadowMap);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, noiseTexture);
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gViewPos);
+
+            ssaoShader->setMat4("projection", projection);
+            ssaoShader->setMat4("view", view);
+            for (int i = 0; i < 64; i++)
+                ssaoShader->setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
+
+            ssaoShader->setInt("gPosition", 0);
+            ssaoShader->setInt("gNormal", 1);
+            ssaoShader->setInt("gAlbedoSpec", 2);
+            ssaoShader->setInt("gShadowMap", 3);
+            ssaoShader->setInt("texNoise", 4);
+            ssaoShader->setInt("gViewPos", 5);
+            quadMesh->Draw(ssaoShader);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+            // --------- SSAO BLUR -----------
+            glBindFramebuffer(GL_FRAMEBUFFER, ssaoBlurFBO);
+            glClearColor(0.0f, 0.0f, 1.0f, 1.00f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glDisable(GL_DEPTH_TEST);
+
+            ssaoBlurShader->use();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+
+            ssaoShader->setInt("ssao", 0);
+            quadMesh->Draw(ssaoBlurShader);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
             // ------------  State 1 -------------
             glEnable(GL_FRAMEBUFFER_SRGB);
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0); /* 🫣 绑定帧缓冲*/
 
-            glClearColor(0.0f, 0.0f, 0.0f, 1.00f);
+            glClearColor(0.0f, 0.0f, 1.0f, 1.00f);
             glClear(GL_COLOR_BUFFER_BIT);
 
             glDisable(GL_DEPTH_TEST);
@@ -723,23 +861,26 @@ int main(int argc, char **argv) {
             glBindTexture(GL_TEXTURE_2D, gBuffer.gNormal);
             glActiveTexture(GL_TEXTURE2);
             glBindTexture(GL_TEXTURE_2D, gBuffer.gAlbedoSpec);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gShadowMap);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, ssaoColorBufferBlur);
 
             D_PhongShader->setInt("gPosition", 0);
             D_PhongShader->setInt("gNormal", 1);
             D_PhongShader->setInt("gAlbedoSpec", 2);
+            D_PhongShader->setInt("gShadowMap", 3);
+            D_PhongShader->setInt("ssao", 4);
+            D_PhongShader->setInt("ssaoOn", ssaoOn);
 
+            D_PhongShader->setMat4("projection", projection);
             D_PhongShader->setCam(scene->camera);
             // 多光源设置
             D_PhongShader->setInt("lightNum", scene->pointLights.size());
             for (int i = 0; i < scene->pointLights.size(); i++) {
-                vec3 lightFront = vec3(0.0f) - scene->pointLights[i]->light.position;
-                auto right = normalize(glm::cross(lightFront, vec3(0.0f, 1.0f, 0.0f)));
-                vec3 lightUp = normalize(glm::cross(right, lightFront));
-                auto lightView = glm::lookAt(scene->pointLights[i]->light.position, vec3(0.0f), lightUp);
-                D_PhongShader->setMat4("lightSpaceMatrix", lightProjection * lightView);
                 D_PhongShader->setPointLight(i, scene->pointLights[i]->light);
             }
-            D_PhongShader->setInt("shadowMap", 30);
+
             quadMesh->Draw(D_PhongShader);
 
             // 渲染其余物体（正向）
@@ -750,11 +891,26 @@ int main(int argc, char **argv) {
 
             glEnable(GL_DEPTH_TEST);
             for (auto &light : scene->pointLights) {
-                // light->updatePosition(curTime);
                 light->shader->use();
                 light->shader->setMVPS(light->ModelMat(), view, projection);
                 light->Draw();
             }
+
+            glDepthFunc(GL_LEQUAL);
+
+            if (skyboxOn) {
+                glDisable(GL_STENCIL_TEST);
+                glDisable(GL_CULL_FACE);
+                SkyboxShader->use();
+                SkyboxShader->setMat4("view", mat4(glm::mat3(view)));
+                SkyboxShader->setMat4("projection", projection);
+                SkyboxShader->setInt("skybox", 0);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_CUBE_MAP, envCubemap);
+                renderCube();
+                glBindVertexArray(0);
+            }
+            glDepthFunc(GL_LESS);
 
             // MainRender(view, projection);
         }
@@ -914,6 +1070,10 @@ void AppMainFunction() {
 
     if (ImGui::Button("DEFERRED Render")) {
         renderMode = DEFERRED_RENDER;
+    }
+
+    if (ImGui::Button("SSAO")) {
+        ssaoOn = !ssaoOn;
     }
 
     static float a;

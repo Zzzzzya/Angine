@@ -45,6 +45,8 @@ class GBuffer {
     unsigned int gPosition;
     unsigned int gNormal;
     unsigned int gAlbedoSpec;
+    unsigned int gShadowMap;
+    unsigned int gViewPos;
 
   private:
     void setUp();

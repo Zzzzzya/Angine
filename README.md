@@ -6,12 +6,15 @@
     - [homework0](#homework0)
     - [homework1](#homework1)
     - [homework2](#homework2)
+    - [homework3](#homework3)
+    - [SSAO](#ssao)
   - [learnOpengl](#learnopengl)
     - [Basic 基础功能](#basic-基础功能)
     - [高级Opengl篇](#高级opengl篇)
     - [高级光照](#高级光照)
     - [PBR](#pbr)
     - [延迟渲染](#延迟渲染)
+    - [SSAO](#ssao-1)
 
 # Angine
 An render engine using opengl and imgui. Just for learning!
@@ -39,6 +42,14 @@ An render engine using opengl and imgui. Just for learning!
 ![img](res/output/gifs/games202/homework2/1.png)
 ![img](res/output/gifs/yesyesyes.gif)
 ![img](res/output/gifs/games202/homework2/image.png)
+
+### homework3
+SSAO
+### SSAO
+> 上图为 无SSAO 下图为 开启SSAO 
+
+  ![img](res/output/gifs/ssaoOff1.png)
+  ![img](res/output/gifs/ssaoOn2.png)
 
 ## learnOpengl
 ### Basic 基础功能
@@ -97,3 +108,9 @@ An render engine using opengl and imgui. Just for learning!
   ![img](res/output/gifs/defer_gbuffer4.png)
 - 延迟渲染
   ![img](res/output/gifs/defer_with.png)
+
+### SSAO
+> 上图为 无SSAO 下图为 开启SSAO 
+
+  ![img](res/output/gifs/ssaoOff.png)
+  ![img](res/output/gifs/ssaoOn.png)
