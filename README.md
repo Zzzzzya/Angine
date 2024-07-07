@@ -8,6 +8,7 @@
     - [homework2](#homework2)
     - [homework3](#homework3)
     - [SSAO](#ssao)
+    - [SSR](#ssr)
   - [learnOpengl](#learnopengl)
     - [Basic 基础功能](#basic-基础功能)
     - [高级Opengl篇](#高级opengl篇)
@@ -50,6 +51,12 @@ SSAO
 
   ![img](res/output/gifs/ssaoOff1.png)
   ![img](res/output/gifs/ssaoOn2.png)
+
+### SSR
+> 下图为打开了SSR  其中图1中的纯黑色阴影是shadowMap计算出的  浅色阴影是场景贴图自带的
+
+  ![img](res/output/gifs/ssr_no.png)
+  ![img](res/output/gifs/ssr_on.png)
 
 ## learnOpengl
 ### Basic 基础功能

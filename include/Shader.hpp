@@ -15,9 +15,10 @@ class Shader {
   public:
     unsigned int pro = -1;
     Shader() = default;
-    Shader(const std::string &vertexPath, const std::string &fragmentPath,
-           const std::string &vertexDirectory = "../res/shaders/vertex/",
-           const std::string &fragmentDirectory = "../res/shaders/fragment/");
+    Shader(const std::string &vertexPath, const std::string &fragmentPath, bool hasGeo = false,
+           const std::string &geoName = "null", const std::string &vertexDirectory = "../res/shaders/vertex/",
+           const std::string &fragmentDirectory = "../res/shaders/fragment/",
+           const std::string &geoDirectory = "../res/shaders/geo/");
     void use();
 
     // Uniform functions
@@ -47,6 +48,9 @@ class Shader {
   private:
     void SetUpShader(const std::string &vertexName, const std::string &fragmentName, const std::string &vertexDirectory,
                      const std::string &fragmentDirectory);
+    void SetUpShader2(const std::string &vertexName, const std::string &fragmentName, const std::string &geoName,
+                      const std::string &vertexDirectory, const std::string &fragmentDirectory,
+                      const std::string &geoDirectory);
 };
 
 #endif

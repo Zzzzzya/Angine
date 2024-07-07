@@ -3,6 +3,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "Scene.hpp"
+#include <glm/gtc/random.hpp>
 #include <GLFW/glfw3.h>
 #include <Windows.h>
 #include "Buffer.hpp"
@@ -34,6 +35,7 @@ static void replaceBackslashWithForwardslash(std::string &str) {
 }
 
 const std::string ProjectModelsPath = "D:\\Files\\Code\\Graphics\\projects\\MyEngine\\res\\models\\";
+float ssrPos = 0.0f;
 
 /* 窗口大小 */
 int imageWidth = 1600;
@@ -119,22 +121,28 @@ shared_ptr<Shader> ScreenBlur;
 shared_ptr<Shader> ScreenGrayScale;
 shared_ptr<Shader> ScreenSharpen;
 
+shared_ptr<Shader> depthShader;
+
 /* Render */
 shared_ptr<Shader> GBufferShader;
 shared_ptr<Shader> D_PhongShader;
+shared_ptr<Shader> D_Phong_SSR_Shader;
 shared_ptr<Shader> ssaoShader;
 shared_ptr<Shader> ssaoBlurShader;
+shared_ptr<Shader> ssrShader;
 
 shared_ptr<Shader> HDR2cubeShader;
 shared_ptr<Shader> irradianceShader;
 
 shared_ptr<Shader> prefilterShader;
 
+shared_ptr<Shader> D_Shader;
 vector<shared_ptr<Shader>> MyShaders;
 /* actual screenShader we r using */
 shared_ptr<Shader> ScreenShader;
 
-const static mat4 lightProjection = glm::perspective(radians(100.0f), 1.0f, 0.1f, 1000.0f);
+const static mat4 lightProjection = glm::perspective(radians(90.0f), 1.0f, 0.1f, 1000.0f);
+const static mat4 lightCubeProjection = glm::perspective(radians(90.0f), (1600.0f / 900.0f), 0.1f, 1000.0f);
 
 /* 天空盒路径 */
 vector<string> faces = {"skybox/right.jpg",  "skybox/left.jpg",  "skybox/top.jpg",
@@ -255,7 +263,11 @@ int main(int argc, char **argv) {
 
     // 帧缓冲
     FrameBuffer framebuffer(imageWidth, imageHeight);
+
+    // shadowMap
     FrameBufferDepthMap shadowMap(shadowWidth, shadowHeight);
+    DepthCube shadowMapCube;
+
     /*😆 帧缓冲使用过程：
         绑定帧缓冲 --> 渲染到这个帧缓冲上
         绑定默认的帧缓冲 --> 绘制一个整个屏幕的四边形 将帧缓冲的颜色缓冲作为他的纹理
@@ -291,14 +303,19 @@ int main(int argc, char **argv) {
     irradianceShader = std::make_shared<Shader>("HDR2cube.vs", "pbr/Convolution.fs");
     prefilterShader = std::make_shared<Shader>("HDR2cube.vs", "pbr/preFilter.fs");
 
+    depthShader = std::make_shared<Shader>("depth.vs", "depth.fs", true, "depth.gs");
+
     GBufferShader = std::make_shared<Shader>("D_MVP_SHADOW.vs", "render/Gbuffer.fs");
 
     // Defer
     D_PhongShader = std::make_shared<Shader>("Nothing_vec2.vs", "Defer/Phong.fs");
+    D_Phong_SSR_Shader = std::make_shared<Shader>("Nothing_vec2.vs", "Defer/Phong_SSR.fs");
     ssaoShader = std::make_shared<Shader>("Nothing_vec2.vs", "Defer/SSAO.fs");
+    ssrShader = std::make_shared<Shader>("Nothing_vec2.vs", "Defer/SSR.fs");
     ssaoBlurShader = std::make_shared<Shader>("Nothing_vec2.vs", "Defer/ssaoBlur.fs");
 
     ScreenShader = ScreenNothing;
+    D_Shader = D_PhongShader;
     MyShaders.push_back(BlinnPhongShader);
     MyShaders.push_back(Phong_ShadowMapShader);
     MyShaders.push_back(ZdepthShader);
@@ -315,9 +332,9 @@ int main(int argc, char **argv) {
     // scene->models.push_back(std::make_shared<Model>("Sponza/Sponza.fbx", D_PhongShader));
     // scene->models[0]->scale = vec3(0.015f);
 
-    scene->models.push_back(std::make_shared<Model>("mari/Marry.obj", PhoneShader));
-    scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
-    // scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PbrShader));
+    scene->models.push_back(std::make_shared<Model>("Texture Shool/anime school.obj", D_PhongShader));
+    // scene->models.push_back(std::make_shared<Model>("floor/bigfloor.obj", Phong_ShadowMapShader));
+    //  scene->models.push_back(std::make_shared<Model>("floor/floor.obj", PbrShader));
 
     // Texture albedo("rust/albedo.png");
     // Texture metallic("rust/metallic.png");
@@ -352,9 +369,12 @@ int main(int argc, char **argv) {
     theLight.color = vec3(300.0f, 300.0f, 300.0f);
     theLight.ones = 0.00;
     theLight.secs = 0.00;
-    theLight.position = vec3(-16.f, 6.f, 0.f);
+    theLight.position = vec3(11.f, 10.f, 0.f);
+    // theLight.position = vec3(-16.f, 6.f, 0.f);
     // theLight.position = vec3(6.0f, 21.0f, 14.0f);
     scene->pointLights[0]->light = theLight;
+
+    /* shadowMap2 */
 
     /* 🫣 天空盒 */
     skybox = std::make_shared<CubeMap>(faces);
@@ -593,6 +613,37 @@ int main(int argc, char **argv) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssaoColorBufferBlur, 0);
 
+    /* MSSR */
+    std::random_device rd;
+    std::mt19937 generator(rd());
+    std::uniform_real_distribution<float> distribution(-1.0f, 1.0f);
+
+    const int numSamples = 64; // 要生成的采样点数量
+
+    std::vector<glm::vec3> ssrSamples;
+    ssrSamples.reserve(numSamples);
+
+    for (int i = 0; i < numSamples; ++i) {
+        // 生成球面坐标
+        glm::vec3 sample = glm::sphericalRand(1.0f); // 生成在单位球面上的随机点
+        ssrSamples.push_back(sample);
+    }
+
+    unsigned int ssrFBO;
+    glGenFramebuffers(1, &ssrFBO);
+    glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);
+
+    unsigned int ssrTexture;
+    glGenTextures(1, &ssrTexture);
+    glBindTexture(GL_TEXTURE_2D, ssrTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 1600, 900, 0, GL_RGB, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssrTexture, 0);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
     /* GB */
     GBuffer gBuffer;
     renderTexture = gBuffer.gPosition;
@@ -603,6 +654,7 @@ int main(int argc, char **argv) {
 
     int frameCount = 0;
 
+    /* RWhile */
     while (!glfwWindowShouldClose(window)) {
         curTime = glfwGetTime();
         deltaTime = curTime - lastTime;
@@ -746,6 +798,8 @@ int main(int argc, char **argv) {
                 }
             }
 
+            //  shadow cube
+
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             // shadow map end
             glViewport(0, 0, display_w, display_h);
@@ -833,12 +887,47 @@ int main(int argc, char **argv) {
             ssaoBlurShader->use();
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, ssaoColorBuffer);
+            for (int i = 0; i < 64; i++)
+                ssaoShader->setVec3("samples[" + std::to_string(i) + "]", ssaoKernel[i]);
 
             ssaoShader->setInt("ssao", 0);
             quadMesh->Draw(ssaoBlurShader);
 
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+            // ------------ SSR ----------------
+            glBindFramebuffer(GL_FRAMEBUFFER, ssrFBO);
+            glClearColor(0.0f, 0.0f, 1.0f, 1.00f);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glDisable(GL_DEPTH_TEST);
+            ssrShader->use();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gPosition);
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gNormal);
+            glActiveTexture(GL_TEXTURE2);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gAlbedoSpec);
+            glActiveTexture(GL_TEXTURE3);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gShadowMap);
+            glActiveTexture(GL_TEXTURE4);
+            glBindTexture(GL_TEXTURE_2D, noiseTexture);
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_2D, gBuffer.gViewPos);
+
+            ssrShader->setMat4("projection", projection);
+            ssrShader->setMat4("view", view);
+            ssrShader->setVec3("cameraPos", scene->camera->position);
+            for (int i = 0; i < 64; i++)
+                ssaoShader->setVec3("samples[" + std::to_string(i) + "]", ssrSamples[i]);
+            ssrShader->setInt("gPosition", 0);
+            ssrShader->setInt("gNormal", 1);
+            ssrShader->setInt("gAlbedoSpec", 2);
+            ssrShader->setInt("gShadowMap", 3);
+            ssrShader->setInt("texNoise", 4);
+            ssrShader->setInt("gViewPos", 5);
+
+            quadMesh->Draw(ssrShader);
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
             // ------------  State 1 -------------
             glEnable(GL_FRAMEBUFFER_SRGB);
 
@@ -853,7 +942,7 @@ int main(int argc, char **argv) {
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-            D_PhongShader->use();
+            D_Shader->use();
 
             glActiveTexture(GL_TEXTURE0);
             glBindTexture(GL_TEXTURE_2D, gBuffer.gPosition);
@@ -865,23 +954,27 @@ int main(int argc, char **argv) {
             glBindTexture(GL_TEXTURE_2D, gBuffer.gShadowMap);
             glActiveTexture(GL_TEXTURE4);
             glBindTexture(GL_TEXTURE_2D, ssaoColorBufferBlur);
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_2D, ssrTexture);
 
-            D_PhongShader->setInt("gPosition", 0);
-            D_PhongShader->setInt("gNormal", 1);
-            D_PhongShader->setInt("gAlbedoSpec", 2);
-            D_PhongShader->setInt("gShadowMap", 3);
-            D_PhongShader->setInt("ssao", 4);
-            D_PhongShader->setInt("ssaoOn", ssaoOn);
+            D_Shader->setInt("gPosition", 0);
+            D_Shader->setInt("gNormal", 1);
+            D_Shader->setInt("gAlbedoSpec", 2);
+            D_Shader->setInt("gShadowMap", 3);
+            D_Shader->setInt("ssao", 4);
+            D_Shader->setInt("ssaoOn", ssaoOn);
+            D_Shader->setInt("ssr", 5);
+            D_Shader->setFloat("ssrPow", ssrPos);
 
-            D_PhongShader->setMat4("projection", projection);
-            D_PhongShader->setCam(scene->camera);
+            D_Shader->setMat4("projection", projection);
+            D_Shader->setCam(scene->camera);
             // 多光源设置
-            D_PhongShader->setInt("lightNum", scene->pointLights.size());
+            D_Shader->setInt("lightNum", scene->pointLights.size());
             for (int i = 0; i < scene->pointLights.size(); i++) {
-                D_PhongShader->setPointLight(i, scene->pointLights[i]->light);
+                D_Shader->setPointLight(i, scene->pointLights[i]->light);
             }
 
-            quadMesh->Draw(D_PhongShader);
+            quadMesh->Draw(D_Shader);
 
             // 渲染其余物体（正向）
             glBindFramebuffer(GL_READ_FRAMEBUFFER, gBuffer.gBuffer);
@@ -1075,6 +1168,8 @@ void AppMainFunction() {
     if (ImGui::Button("SSAO")) {
         ssaoOn = !ssaoOn;
     }
+
+    ImGui::SliderFloat("ssr", &ssrPos, 0.0f, 1.0f);
 
     static float a;
     ImGui::SliderFloat("a", &a, 0.0f, 10.0f);

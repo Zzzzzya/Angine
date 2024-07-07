@@ -29,8 +29,6 @@ uniform sampler2D gShadowMap;
 
 uniform sampler2D ssao;
 uniform bool ssaoOn;
-uniform float ssrPow;
-uniform sampler2D ssr;
 
 out vec4 FragColor;
 
@@ -38,6 +36,8 @@ uniform Camera camera;
 uniform int lightNum;
 uniform PointLight light[10];
 uniform mat4 projection;
+
+const int SSR_NUM = 20;
 
 void main() {
     vec3 realNormal;
@@ -78,6 +78,5 @@ void main() {
         result = result + reduce * (ambient + diffuse + specular) * (1 - shadow);
     }
 
-    vec3 L_in = ssrPow * texture(ssr, TexCoords).xyz;
-    FragColor = vec4(result + L_in, 1.0f);
+    FragColor = vec4(result, 1.0f);
 }

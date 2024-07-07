@@ -51,3 +51,13 @@ class GBuffer {
   private:
     void setUp();
 };
+
+class DepthCube {
+  public:
+    DepthCube();
+    unsigned int depthCubemap;
+    unsigned int depthCubeFBO;
+
+  private:
+    void setUp();
+};
