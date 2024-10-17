@@ -9,6 +9,7 @@
     - [homework3](#homework3)
     - [SSAO](#ssao)
     - [SSR](#ssr)
+    - [SDF距离场阴影](#sdf距离场阴影)
   - [learnOpengl](#learnopengl)
     - [Basic 基础功能](#basic-基础功能)
     - [高级Opengl篇](#高级opengl篇)
@@ -57,6 +58,11 @@ SSAO
 
   ![img](res/output/gifs/ssr_no.png)
   ![img](res/output/gifs/ssr_on.png)
+  ![](https://pic.imgdb.cn/item/6710a4cfd29ded1a8ceaa8d6.png)
+
+### SDF距离场阴影
+ ![](https://pic.imgdb.cn/item/67109cc2d29ded1a8ce4727f.png)
+ ![](https://pic.imgdb.cn/item/67109cc2d29ded1a8ce4726e.png)
 
 ## learnOpengl
 ### Basic 基础功能
