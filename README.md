@@ -58,11 +58,11 @@ SSAO
 
   ![img](res/output/gifs/ssr_no.png)
   ![img](res/output/gifs/ssr_on.png)
-  ![](https://pic.imgdb.cn/item/6710a4cfd29ded1a8ceaa8d6.png)
+  ![](res/output/gifs/ssr.png)
 
 ### SDF距离场阴影
- ![](https://pic.imgdb.cn/item/67109cc2d29ded1a8ce4727f.png)
- ![](https://pic.imgdb.cn/item/67109cc2d29ded1a8ce4726e.png)
+ ![](res/output/gifs/sdf_hard.png)
+ ![](res/output/gifs/sdf_soft.png)
 
 ## learnOpengl
 ### Basic 基础功能
